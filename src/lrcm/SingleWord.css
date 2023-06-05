@@ -20,6 +20,7 @@
     height: 1.1em;
     line-height: 1.1em;
     font-size: 0.8em;
+    display: flex;
 }
 
 .single-word.empty {
@@ -27,8 +28,8 @@
 }
 
 .single-word .middle {
-    height: 1.4em;
-    line-height: 1.6em;
+    height: 1.2em;
+    line-height: 1.2em;
     font-size: 2em;
 }
 

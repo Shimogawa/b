@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { Button, Col, Input, Row, Toast } from '@douyinfe/semi-ui';
 import React, { useRef, useState } from 'react';
-import './styles/FileSelector.css';
+import './FileSelector.css';
 import { ValidateStatus } from '@douyinfe/semi-ui/lib/es/input';
 
 export default function FileSelector(
@@ -11,6 +11,7 @@ export default function FileSelector(
     onSelected: (file: File) => void,
     text?: string,
     strictChecking?: boolean,
+    additionals?: JSX.Element,
   }
 ) {
   const fileTypes = new Set(props.accept.split(',').map(x => x.trim()));
@@ -55,19 +56,16 @@ export default function FileSelector(
   };
 
   return (
-    <Row gutter={16}>
-      <Col span={12}>
-        <Input ref={showNameRef} readonly
-          placeholder={props.defaultValue} value={message} validateStatus={validateStatus} />
-      </Col>
-      <Col span={12}>
-        <Button onClick={processClick}>{props.text || 'Select'}</Button>
-        <input
-          ref={inputRef} type="file"
-          accept={props.accept}
-          className="file-selector-input"
-          onChange={processInput} />
-      </Col>
-    </Row >
+    <div className='file-selector-container'>
+      <Input ref={showNameRef} readonly
+        placeholder={props.defaultValue} value={message} validateStatus={validateStatus} />
+      <Button onClick={processClick}>{props.text || 'Select'}</Button>
+      <input hidden
+        ref={inputRef} type="file"
+        accept={props.accept}
+        className="file-selector-input"
+        onChange={processInput} />
+      {props.additionals}
+    </div >
   );
 }

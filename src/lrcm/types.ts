@@ -10,5 +10,5 @@ export interface TimedObject {
 
 export interface LyricElement {
   obj: TimedObject
-  furi?: [TimedObject]
+  furi?: TimedObject[]
 }

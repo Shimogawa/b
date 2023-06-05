@@ -25,3 +25,16 @@ export function msToTimeString(ms: number): string {
   const lms = ms % 1000;
   return `${secToTimeString(Math.floor(ms / 1000))}.${formatInt(lms, 3)}`;
 }
+
+/**
+ * Takes a character and a unicode range. Returns true if the char is in the range.
+ * @param  {string}  char  unicode character
+ * @param  {number}  start unicode start range
+ * @param  {number}  end   unicode end range
+ * @return {boolean}
+ */
+export function isCharInRange(c: string, start: number, end: number) {
+  if (c.length === 0) return false;
+  const code = c.charCodeAt(0);
+  return start <= code && code <= end;
+}

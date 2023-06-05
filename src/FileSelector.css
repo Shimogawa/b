@@ -1,0 +1,17 @@
+.file-selector-input {
+    opacity: 0;
+    position: absolute;
+}
+
+.file-selector-container {
+    display: flex;
+    align-items: center;
+}
+
+.file-selector-container>* {
+    max-width: 450px;
+}
+
+.file-selector-container>*:not(:last-child) {
+    margin-right: 10px;
+}

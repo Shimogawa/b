@@ -5,6 +5,7 @@ specifiers:
   '@douyinfe/semi-ui': ^2.36.0
   '@types/react': ^18.0.37
   '@types/react-dom': ^18.0.11
+  '@types/wanakana': ^4.0.3
   '@typescript-eslint/eslint-plugin': ^5.59.0
   '@typescript-eslint/parser': ^5.59.0
   '@vitejs/plugin-react-swc': ^3.0.0
@@ -17,13 +18,16 @@ specifiers:
   react-dom: ^18.2.0
   typescript: ^5.0.2
   vite: ^4.3.9
+  wanakana: ^5.1.0
 
 dependencies:
   '@douyinfe/semi-icons': 2.36.0_react@18.2.0
   '@douyinfe/semi-ui': 2.36.0_biqbaboplfbrettd7655fr4n2y
+  '@types/wanakana': 4.0.3
   furigana: 0.19.3
   react: 18.2.0
   react-dom: 18.2.0_react@18.2.0
+  wanakana: 5.1.0
 
 devDependencies:
   '@types/react': 18.2.8
@@ -562,6 +566,10 @@ packages:
   /@types/semver/7.5.0:
     resolution: {integrity: sha512-G8hZ6XJiHnuhQKR7ZmysCeJWE08o8T0AXtk5darsCaTVsYZhhgUrq53jizaR2FvsoeCwJhlmwTjkXBY5Pn/ZHw==}
     dev: true
+
+  /@types/wanakana/4.0.3:
+    resolution: {integrity: sha512-AibaWzahBKizxmsAy8rEWSIqqcT0v9KZTS8S6zPLmStGBFdccYfXydhgwYOV+6lGqQ890MpA4h2MPET3uPk9Zg==}
+    dev: false
 
   /@typescript-eslint/eslint-plugin/5.59.8_54dzngpokg2nc3pytyodfzhcz4:
     resolution: {integrity: sha512-JDMOmhXteJ4WVKOiHXGCoB96ADWg9q7efPWHRViT/f09bA8XOMLAVHHju3l0MkZnG1izaWXYmgvQcUjTRcpShQ==}
@@ -2198,6 +2206,11 @@ packages:
     optionalDependencies:
       fsevents: 2.3.2
     dev: true
+
+  /wanakana/5.1.0:
+    resolution: {integrity: sha512-QJ5XNTqL5gM1JR2ikESMi+xKx16TIuZDynj6LagqK4YCWnRihtxprzCnVI1SappWI8RuiSAANGoePEV5pptiiQ==}
+    engines: {node: '>=12'}
+    dev: false
 
   /which-boxed-primitive/1.0.2:
     resolution: {integrity: sha512-bwZdv0AKLpplFY2KZRX6TvyuN7ojjr7lwkg6ml0roIy9YeuSr7JS372qlNW18UQYzgYK9ziGcerWqZOmEn9VNg==}

@@ -1,18 +1,20 @@
 import { useRef, useState } from 'react';
 import './App.css';
-import { Layout } from '@douyinfe/semi-ui';
+import { Layout, Space, Switch } from '@douyinfe/semi-ui';
 
 import FileSelector from './FileSelector';
 import Navbar from './Navbar';
 import MusicPlayer from './music_player/MusicPlayer';
 import { LyricElement } from './lrcm/types';
 import LyricPanel from './lrcm/LyricPanel';
+import { parseRawLyrics } from './lrcm/lrc';
 
 function App() {
   const [audioFile, setAudioFile] = useState<File>();
   const { Header, Footer, Content } = Layout;
   const [lyricElems, setLyricElems] = useState<LyricElement[]>([]);
-  const [l, setL] = useState('');
+  const [rawLyrics, setRawLyrics] = useState('');
+  const [needsProcessFuri, setNeedsProcessFuri] = useState(true);
 
   return (
     <Layout>
@@ -32,14 +34,22 @@ function App() {
             text='Select Lyric File'
             accept='*/*'
             strictChecking={false}
-            onSelected={async f => setL(await f.text())} />
-          <LyricPanel lyrics={l} />
+            additionals={<>
+              <span style={{ fontSize: 10 }}>Process Furi:</span>
+              <Switch checked={needsProcessFuri} onChange={b => setNeedsProcessFuri(b)} />
+            </>}
+            onSelected={async f => {
+              const raw = await f.text();
+              setLyricElems(parseRawLyrics(raw, needsProcessFuri));
+              setRawLyrics(raw);
+            }} />
+          <LyricPanel lyrics={lyricElems} rawLyrics={rawLyrics} />
         </div>
       </Content>
       <Footer className='sticky-footer'>
         <MusicPlayer music={audioFile} />
       </Footer>
-    </Layout>
+    </Layout >
   );
 }
 

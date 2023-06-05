@@ -12,9 +12,11 @@
   "dependencies": {
     "@douyinfe/semi-icons": "^2.36.0",
     "@douyinfe/semi-ui": "^2.36.0",
+    "@types/wanakana": "^4.0.3",
     "furigana": "^0.19.3",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "wanakana": "^5.1.0"
   },
   "devDependencies": {
     "@types/react": "^18.0.37",
