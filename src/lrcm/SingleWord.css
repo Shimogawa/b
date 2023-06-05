@@ -1,0 +1,37 @@
+.single-word {
+    height: 100px;
+    display: flex;
+    flex-direction: column;
+}
+
+.single-word>* {
+    border: 1px solid;
+    box-sizing: border-box;
+}
+
+.line-break {
+    flex-basis: 100%;
+    width: 0px;
+    height: 0px;
+    overflow: hidden;
+}
+
+.single-word .upper {
+    height: 1.1em;
+    line-height: 1.1em;
+    font-size: 0.8em;
+}
+
+.single-word.empty {
+    min-width: 30px;
+}
+
+.single-word .middle {
+    height: 1.4em;
+    line-height: 1.6em;
+    font-size: 2em;
+}
+
+.single-word .lower {
+    height: 20px;
+}

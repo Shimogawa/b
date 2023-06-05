@@ -1,0 +1,20 @@
+.main-content {
+    padding: 24px 24px 174px 24px;
+    background-color: var(--semi-color-bg-0);
+}
+
+.sticky-footer {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    height: 150px;
+    width: 100%;
+    justify-content: space-between;
+    padding: 20px;
+    color: var(--semi-color-text-2);
+    background-color: rgba(var(--semi-grey-0), 1);
+}
+
+.main-element>* {
+    padding: 10px 15px 10px 15px;
+}
