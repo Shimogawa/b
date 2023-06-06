@@ -1,15 +1,20 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './App.css';
-import { Layout, Space, Switch } from '@douyinfe/semi-ui';
+import { Layout, Space, Switch, Toast } from '@douyinfe/semi-ui';
 
 import FileSelector from './FileSelector';
 import Navbar from './Navbar';
 import MusicPlayer from './music_player/MusicPlayer';
 import { LyricElement } from './lrcm/types';
 import LyricPanel from './lrcm/LyricPanel';
-import { parseRawLyrics } from './lrcm/lrc';
+import { initLrc, parseRawLyrics } from './lrcm/lrc';
 
 function App() {
+  useEffect(() => {
+    Toast.warning('Loading word tokenizer...');
+    initLrc().then(() => Toast.success('Tokenizer loaded.'));
+  }, []);
+
   const [audioFile, setAudioFile] = useState<File>();
   const { Header, Footer, Content } = Layout;
   const [lyricElems, setLyricElems] = useState<LyricElement[]>([]);
@@ -43,7 +48,7 @@ function App() {
               setLyricElems(parseRawLyrics(raw, needsProcessFuri));
               setRawLyrics(raw);
             }} />
-          <LyricPanel lyrics={lyricElems} rawLyrics={rawLyrics} />
+          <LyricPanel lyricState={[lyricElems, setLyricElems]} />
         </div>
       </Content>
       <Footer className='sticky-footer'>

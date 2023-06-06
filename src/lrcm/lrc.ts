@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { IpadicFeatures, Kuromoji, Tokenizer } from '../kuromoji/kuromoji.d.ts';
 import '../kuromoji/kuromoji';
 import { LyricElement } from './types';
@@ -7,22 +8,22 @@ import { fit } from 'furigana';
 
 declare const kuromoji: Kuromoji;
 
-const _tokenizer: { value?: Tokenizer<IpadicFeatures> } = {};
-kuromoji.builder({ dicPath: 'https://raw.githubusercontent.com/takuyaa/kuromoji.js/master/dict/' })
-  .build((err, tk) => {
-    if (err) {
-      console.error(err);
-      return;
-    }
-    _tokenizer.value = tk;
-  });
+const tokenizer: { value?: Tokenizer<IpadicFeatures> } = {};
 
-while (_tokenizer.value === undefined) {
-  await new Promise(r => setTimeout(r, 1000));
+export async function initLrc() {
+  kuromoji.builder({ dicPath: 'https://raw.githubusercontent.com/takuyaa/kuromoji.js/master/dict/' })
+    .build((err, tk) => {
+      if (err) {
+        console.error(err);
+        return;
+      }
+      tokenizer.value = tk;
+    });
+
+  while (tokenizer.value === undefined) {
+    await new Promise(r => setTimeout(r, 1000));
+  }
 }
-
-
-const tokenizer = <Tokenizer<IpadicFeatures>>_tokenizer.value;
 
 // TODO: add a map for common mistaken tokens to improve correctness
 
@@ -37,7 +38,7 @@ export function parseRawLyrics(s: string, processFuri = true): LyricElement[] {
   //   obj: { text: c, duration: {} },
   //   furi: undefined,
   // }));
-  const tokens = tokenizer.tokenize(s);
+  const tokens = tokenizer.value!.tokenize(s);
   const res: LyricElement[] = [];
   tokens.forEach((r) => {
     if (processFuri && r.reading && [...r.basic_form].some(wanakana.isKanji)) {

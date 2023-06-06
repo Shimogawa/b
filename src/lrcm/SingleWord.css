@@ -33,6 +33,10 @@
     font-size: 2em;
 }
 
+.single-word .middle.selected {
+    background-color: aqua;
+}
+
 .single-word .lower {
     height: 20px;
 }

@@ -1,4 +1,5 @@
 .lyric-panel {
     display: flex;
     flex-wrap: wrap;
+    user-select: none;
 }
