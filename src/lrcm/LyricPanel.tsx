@@ -1,50 +1,11 @@
-import React, { Fragment, useEffect, useRef, useState } from 'react';
+import React, { Fragment, useEffect, useState } from 'react';
 import SingleWord from './SingleWord';
 import './LyricPanel.css';
-import { LyricElement } from './types';
+import { DragSelection, LyricElement } from './types';
 
 type LyricPanelProps = {
   // rawLyrics: string,
   lyricState: [LyricElement[], React.Dispatch<React.SetStateAction<LyricElement[]>>]
-}
-
-class DragSelection {
-  private _anchor: number;
-  private _dragTo: number;
-
-  constructor(anchor = -1, dragTo = -1) {
-    this._anchor = anchor;
-    this._dragTo = dragTo;
-  }
-
-  public set anchor(v: number) {
-    this._anchor = v;
-  }
-
-  public get anchor(): number {
-    return this._anchor;
-  }
-
-  public set dragTo(v: number) {
-    this._dragTo = v;
-  }
-
-  public get dragTo(): number {
-    return this._dragTo;
-  }
-
-  public isInDragSelection(idx: number): boolean {
-    const smaller = this._anchor < this._dragTo ? this._anchor : this._dragTo;
-    const bigger = this._anchor === smaller ? this._dragTo : this._anchor;
-    return smaller <= idx && idx <= bigger;
-  }
-
-  public clone(): DragSelection {
-    const d = new DragSelection();
-    d._anchor = this._anchor;
-    d._dragTo = this._dragTo;
-    return d;
-  }
 }
 
 export default function LyricPanel(props: LyricPanelProps) {
@@ -54,10 +15,14 @@ export default function LyricPanel(props: LyricPanelProps) {
   const [lyrics, setLyrics] = props.lyricState;
 
   const [lineBreakPositions, setLineBreakPositions] = useState<number[]>([]);
+  const [curSelectedLineNo, setCurSelectedLineNo] = useState(-1);
   useEffect(() => {
     const lbPos: number[] = [];
     lyrics.forEach((e, i) => { if (e.obj.text === '\n') lbPos.push(i); });
     setLineBreakPositions(lbPos);
+    setDragSelection(new DragSelection());
+    setCurSelectedLineNo(-1);
+    setIsMouseDown(false);
   }, [lyrics]);
 
   useEffect(() => {
@@ -86,6 +51,19 @@ export default function LyricPanel(props: LyricPanelProps) {
     if (lineBreakPositions.indexOf(id) >= 0) {
       return;
     }
+    // find the line #
+    let lineNo = -1;
+    let i = 0;
+    for (; i < lineBreakPositions.length; i++) {
+      if (lineBreakPositions[i] < id)
+        continue;
+      lineNo = i;
+      break;
+    }
+    if (lineNo === -1) lineNo = i;
+    // console.log(lineNo);
+    // console.log(lineBreakPositions);
+    setCurSelectedLineNo(lineNo);
     setIsMouseDown(true);
     setDragSelection(new DragSelection(id, id));
   };
@@ -110,7 +88,10 @@ export default function LyricPanel(props: LyricPanelProps) {
       {lyrics.map((l, i) => {
         const singleWord = <SingleWord
           id={i} lyricElement={l} key={i}
-          isSelected={dragSelection.isInDragSelection(i)}
+          // isSelected={dragSelection.isInDragSelection(i)}
+          lineBreakPositions={lineBreakPositions}
+          selectedLineNo={curSelectedLineNo}
+          retrieveSelection={() => dragSelection}
           onLyricElementChange={(e) => setLyrics([...lyrics.slice(undefined, i), e, ...lyrics.slice(i + 1)])}
           onMouseDown={onElementMouseDown}
           onMouseOver={onElementMouseOver}

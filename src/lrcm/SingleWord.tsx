@@ -1,14 +1,17 @@
 import React, { RefObject, useEffect, useRef, useState } from 'react';
 import './SingleWord.css';
 import { Input, Popconfirm, Toast } from '@douyinfe/semi-ui';
-import { LyricElement, TimedObject } from './types';
+import { DragSelection, LyricElement, TimedObject } from './types';
 
 type SingleWordProps = {
   id: number
   lyricElement: LyricElement,
-  isSelected: boolean,
+  // isSelected: boolean,
+  selectedLineNo: number,
+  lineBreakPositions: number[],
 
   // hooks
+  retrieveSelection: () => DragSelection,
   onLyricElementChange: (elem: LyricElement) => void,
   onMouseDown?: React.MouseEventHandler<HTMLDivElement>,
   onMouseOver?: React.MouseEventHandler<HTMLDivElement>,
@@ -17,17 +20,39 @@ type SingleWordProps = {
 export default function SingleWord({
   id,
   lyricElement,
-  isSelected,
+  // isSelected,
+  selectedLineNo,
+  lineBreakPositions,
+  retrieveSelection,
   onLyricElementChange,
   onMouseDown,
   onMouseOver,
 }: SingleWordProps) {
   // const [furi, setFuri] = useState<TimedObject[]>();
   const furiInputRef = useRef<React.RefObject<HTMLInputElement>>();
+  // const [isSelected, setIsSelected] = useState(false);
+  const [isLineSelected, setIsLineSelected] = useState(false);
 
-  // useEffect(() => {
-  //   setFuri(lyricElement.furi);
-  // }, [lyricElement]);
+  useEffect(() => {
+    if (selectedLineNo < 0) return;
+    if (selectedLineNo === 0 && id < lineBreakPositions[selectedLineNo]) {
+      setIsLineSelected(true);
+      return;
+    } else if (selectedLineNo === lineBreakPositions.length && id > lineBreakPositions[selectedLineNo]) {
+      // last line
+      setIsLineSelected(true);
+      return;
+    } else if (id > lineBreakPositions[selectedLineNo - 1] && id < lineBreakPositions[selectedLineNo]) {
+      setIsLineSelected(true);
+      return;
+    }
+  }, [id, selectedLineNo, lineBreakPositions]);
+
+  const checkIsSelected = () => {
+    if (!isLineSelected) return false;
+    const selection = retrieveSelection();
+    return selection.isInDragSelection(id);
+  };
 
   const onFuriConfirm = () => {
     if (!furiInputRef.current) {
@@ -62,13 +87,22 @@ export default function SingleWord({
         {lyricElement.furi && [...lyricElement.furi].map((c, i) => <span key={`${id}-furi-${i}`}>{c.text}</span>)}
       </div>
     </Popconfirm>
-    <div
-      id={`le-middle-${id}`}
-      className={'middle' + (isSelected ? ' selected' : '')}
-      onMouseOver={onMouseOver}
-      onMouseDown={onMouseDown}>
-      {lyricElement.obj.text}
-    </div>
+    {isLineSelected
+      ? <div
+        id={`le-middle-${id}`}
+        className={'middle' + (checkIsSelected() ? ' selected' : '')}
+        onMouseOver={onMouseOver}
+        onMouseDown={onMouseDown}>
+        {lyricElement.obj.text}
+      </div>
+      : <div
+        id={`le-middle-${id}`}
+        className={'middle'}
+        onMouseOver={onMouseOver}
+        onMouseDown={onMouseDown}>
+        {lyricElement.obj.text}
+      </div>
+    }
     <div className='lower' id={`le-lower-${id}`} style={{ fontSize: 5 }}>{lyricElement.obj.text.codePointAt(0)}</div>
   </div>);
 }

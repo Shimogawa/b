@@ -45,7 +45,11 @@ function App() {
             </>}
             onSelected={async f => {
               const raw = await f.text();
-              setLyricElems(parseRawLyrics(raw, needsProcessFuri));
+              try {
+                setLyricElems(parseRawLyrics(raw, needsProcessFuri));
+              } catch (err) {
+                Toast.error('Parse error: ' + (err as Error).message);
+              }
               setRawLyrics(raw);
             }} />
           <LyricPanel lyricState={[lyricElems, setLyricElems]} />
