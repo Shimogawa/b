@@ -23,7 +23,7 @@ const SingleWord = React.memo(function SingleWord({
   onMouseOver,
   isSelected,
 }: SingleWordProps) {
-  console.error('re-render')
+  console.error('re-render');
   // const [furi, setFuri] = useState<TimedObject[]>();
   const furiInputRef = useRef<React.RefObject<HTMLInputElement>>();
   // const [isSelected, setIsSelected] = useState(false);
@@ -70,7 +70,9 @@ const SingleWord = React.memo(function SingleWord({
       onMouseDown={onMouseDown}>
       {lyricElement.obj.text}
     </div>
-    <div className='lower' id={`le-lower-${id}`} style={{ fontSize: 5 }}>{lyricElement.obj.text.codePointAt(0)}</div>
+    <div className='lower' id={`le-lower-${id}`} style={{ fontSize: '12px' }}>
+      {[...lyricElement.obj.text].reduce((prev, cur) => prev + ' ' + cur.codePointAt(0)?.toString(16), '')}
+    </div>
   </div>);
 });
 
