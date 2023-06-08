@@ -3,3 +3,19 @@
     flex-wrap: wrap;
     user-select: none;
 }
+
+.lyric-toolbar {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: flex-start;
+    padding: 10px;
+    box-sizing: border-box;
+    position: sticky;
+    top: 0px;
+    background-color: rgba(var(--semi-grey-1), 1);
+}
+
+.lyric-toolbar>*:not(:last-child) {
+    margin-right: 10px;
+}

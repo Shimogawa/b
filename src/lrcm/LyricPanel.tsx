@@ -3,6 +3,7 @@ import SingleWord from './SingleWord';
 import './LyricPanel.css';
 import { DragSelection, LyricElement, TimedObject } from './types';
 import { Button, Toast } from '@douyinfe/semi-ui';
+import { parseRawLyrics } from './lrc';
 
 type LyricPanelProps = {
   // rawLyrics: string,
@@ -92,7 +93,6 @@ export default function LyricPanel(props: LyricPanelProps) {
       return;
     }
     if (lineBreakPositions.indexOf(id) >= 0) {
-      setDragTo(null);
       return;
     }
     if (lineBreakPositions.indexOf(dragAnchorRef.current) >= 0) {
@@ -152,7 +152,7 @@ export default function LyricPanel(props: LyricPanelProps) {
           endTime: selectedLrcs[selectedLrcs.length - 1].obj.duration.endTime,
         }
       },
-      furi: selectedLrcs.map(e => e.furi).filter(e => e !== undefined).flat() as TimedObject[],
+      furi: selectedLrcs.map(e => e.furi ? e.furi : { text: e.obj.text, duration: { ...e.obj.duration } }).flat(),
     };
     // console.log(mergedObj);
 
@@ -166,9 +166,52 @@ export default function LyricPanel(props: LyricPanelProps) {
     setLyrics(newLyrics);
   };
 
+  const onSplitBtnClick = () => { };
+
+  const onLoadFuriBtnClick = () => {
+    const currSelection = getCurrSelection();
+    if (currSelection.isValid()) {
+      const l = lyrics.slice(undefined, currSelection.smaller);
+      const r = lyrics.slice(currSelection.bigger + 1);
+      setLyrics([
+        ...l,
+        ...parseRawLyrics(lyrics.slice(currSelection.smaller, currSelection.bigger + 1).map(e => e.obj.text).join('')),
+        ...r
+      ]);
+    } else {
+      setLyrics(parseRawLyrics(lyrics.map(e => e.obj.text).join('')));
+    }
+    resetSelectionStates();
+  };
+
+  const onClearFuriBtnClick = () => {
+    if (getCurrSelection().isValid()) {
+      setLyrics(lyrics.map((e, id) => {
+        if (id >= getCurrSelection().smaller && id <= getCurrSelection().bigger) {
+          return {
+            obj: e.obj,
+            furi: undefined,
+          };
+        }
+        return e;
+      }));
+    } else {
+      setLyrics(lyrics.map(e => {
+        return {
+          obj: e.obj,
+          furi: undefined,
+        };
+      }));
+    }
+    resetSelectionStates();
+  };
+
   return lyrics.length > 0 ? (<>
-    <div>
+    <div className='lyric-toolbar'>
       <Button onClick={onMergeBtnClick}>Merge</Button>
+      <Button onClick={onSplitBtnClick}>Split</Button>
+      <Button onClick={onLoadFuriBtnClick}>Load Furi</Button>
+      <Button onClick={onClearFuriBtnClick}>Clear Furi</Button>
     </div>
     <div className='lyric-panel' onMouseDown={mouseDownListener}>
       {lyrics.map((l, id) => {

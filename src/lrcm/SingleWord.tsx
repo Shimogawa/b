@@ -68,7 +68,7 @@ const SingleWord = React.memo(function SingleWord({
       className={'middle' + (isSelected ? ' selected' : '')}
       onMouseOver={onMouseOver}
       onMouseDown={onMouseDown}>
-      {lyricElement.obj.text}
+      {[...lyricElement.obj.text].map((c, i) => <span key={`${id}-text-${i}`}>{c}</span>)}
     </div>
     <div className='lower' id={`le-lower-${id}`} style={{ fontSize: '12px' }}>
       {[...lyricElement.obj.text].reduce((prev, cur) => prev + ' ' + cur.codePointAt(0)?.toString(16), '')}

@@ -18,7 +18,6 @@ function App() {
   const [audioFile, setAudioFile] = useState<File>();
   const { Header, Footer, Content } = Layout;
   const [lyricElems, setLyricElems] = useState<LyricElement[]>([]);
-  const [rawLyrics, setRawLyrics] = useState('');
   const [needsProcessFuri, setNeedsProcessFuri] = useState(true);
 
   return (
@@ -50,7 +49,6 @@ function App() {
               } catch (err) {
                 Toast.error('Parse error: ' + (err as Error).message);
               }
-              setRawLyrics(raw);
             }} />
           <LyricPanel lyricState={[lyricElems, setLyricElems]} />
         </div>
