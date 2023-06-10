@@ -2,8 +2,9 @@ import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react
 import SingleWord from './SingleWord';
 import './LyricPanel.css';
 import { DragSelection, LyricElement, TimedObject } from './types';
-import { Button, Toast } from '@douyinfe/semi-ui';
+import { Button, Dropdown, Toast } from '@douyinfe/semi-ui';
 import { parseRawLyrics } from './lrc';
+import { IconCaretup, IconDelete, IconPause, IconPlus, IconTriangleUp } from '@douyinfe/semi-icons';
 
 type LyricPanelProps = {
   // rawLyrics: string,
@@ -15,11 +16,13 @@ type LyricPanelProps = {
 export default function LyricPanel(props: LyricPanelProps) {
   const mouseDownRef = useRef(false);
   const dragAnchorRef = useRef<number | null>(null);
-  const [dragTo, setDragTo] = useState<number | null>(null);
+  const lyricsRef = useRef<LyricElement[]>([]);
+  const [dragTo, setDragTo] = useState<[number] | null>(null);
 
   const [lyrics, setLyrics] = props.lyricState;
 
-  const [lineBreakPositions, setLineBreakPositions] = useState<number[]>([]);
+  // const [lineBreakPositions, setLineBreakPositions] = useState<number[]>([]);
+  const lineBreakPositionsRef = useRef<number[]>([]);
   const [curSelectedLineNo, setCurSelectedLineNo] = useState(-1);
 
   const resetSelectionStates = () => {
@@ -32,14 +35,14 @@ export default function LyricPanel(props: LyricPanelProps) {
   useEffect(() => {
     const lbPos: number[] = [];
     lyrics.forEach((e, i) => { if (e.obj.text === '\n') lbPos.push(i); });
-    setLineBreakPositions(lbPos);
+    // setLineBreakPositions(lbPos);
+    lineBreakPositionsRef.current = lbPos;
     resetSelectionStates();
   }, [lyrics]);
 
   useEffect(() => {
     function mouseUpListener(e: MouseEvent) {
       e.stopPropagation();
-      console.log('mouse up');
       mouseDownRef.current = false;
       // dragAnchorRef.current = null;
     }
@@ -58,80 +61,76 @@ export default function LyricPanel(props: LyricPanelProps) {
   };
 
   const onElementMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // BUG: clicking on the last dragged item doesn't work
     if (mouseDownRef.current) return;
     e.stopPropagation();
     mouseDownRef.current = true;
     const id = checkState(e.currentTarget.id);
+    console.log(id);
     let lineNo = -1;
-    if ((lineNo = lineBreakPositions.indexOf(id)) >= 0) {
-      console.log('line break');
+    if ((lineNo = lineBreakPositionsRef.current.indexOf(id)) >= 0) {
       setCurSelectedLineNo(lineNo);
       dragAnchorRef.current = id;
-      setDragTo(id);
+      setDragTo([id]);
       return;
     }
     // find the line #
     let i = 0;
-    for (; i < lineBreakPositions.length; i++) {
-      if (lineBreakPositions[i] < id)
+    for (; i < lineBreakPositionsRef.current.length; i++) {
+      if (lineBreakPositionsRef.current[i] < id)
         continue;
       lineNo = i;
       break;
     }
     if (lineNo === -1) lineNo = i;
-    // console.log(lineBreakPositions);
     setCurSelectedLineNo(lineNo);
     dragAnchorRef.current = id;
-    setDragTo(id);
-  }, [lineBreakPositions]);
+    setDragTo([id]);
+  }, []);
 
   const onElementMouseOver = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    console.log('mouse over');
-    if (!mouseDownRef.current || !dragAnchorRef.current) return;
+    if (!mouseDownRef.current || dragAnchorRef.current === null) return;
     const id = checkState(e.currentTarget.id);
     if (dragAnchorRef.current === id) {
       return;
     }
-    if (lineBreakPositions.indexOf(id) >= 0) {
-      return;
-    }
-    if (lineBreakPositions.indexOf(dragAnchorRef.current) >= 0) {
+    if (lineBreakPositionsRef.current.indexOf(dragAnchorRef.current) >= 0) {
       resetSelectionStates();
       return;
     }
-    setDragTo(id);
-  }, [lineBreakPositions]);
+    setDragTo([id]);
+  }, []);
 
   const onLyricElementChange = useCallback((e: LyricElement, id: number) => {
-    setLyrics([...lyrics.slice(undefined, id), e, ...lyrics.slice(id + 1)]);
-  }, [lyrics, setLyrics]);
+    setLyrics((prev) => [...prev.slice(undefined, id), e, ...prev.slice(id + 1)]);
+  }, [setLyrics]);
 
   const getCurrSelection = useCallback(() => {
     if (dragAnchorRef.current === null || dragTo === null) {
       return new DragSelection();
     }
-    if (dragAnchorRef.current === dragTo) {
-      return new DragSelection(dragAnchorRef.current, dragTo);
+    if (dragAnchorRef.current === dragTo[0]) {
+      return new DragSelection(dragAnchorRef.current, dragTo[0]);
     }
     const dragFrom = dragAnchorRef.current;
-    const smaller = dragTo < dragFrom ? dragTo : dragFrom;
-    const bigger = dragTo === smaller ? dragFrom : dragTo;
-    for (const lbPos of lineBreakPositions) {
+    const smaller = dragTo[0] < dragFrom ? dragTo[0] : dragFrom;
+    const bigger = dragTo[0] === smaller ? dragFrom : dragTo[0];
+    for (const lbPos of lineBreakPositionsRef.current) {
       if (lbPos > bigger)
         break;
       if (lbPos < smaller)
         continue;
       return new DragSelection();
     }
-    return new DragSelection(dragAnchorRef.current, dragTo);
-  }, [dragTo, lineBreakPositions]);
+    return new DragSelection(dragAnchorRef.current, dragTo[0]);
+  }, [dragTo]);
 
   const mouseDownListener = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    console.log('mouse down outside');
     resetSelectionStates();
   };
 
+  // TODO: add merge options: separator, merge english only
   const onMergeBtnClick = () => {
     const selection = getCurrSelection();
     if (!selection.isValid()) {
@@ -166,7 +165,37 @@ export default function LyricPanel(props: LyricPanelProps) {
     setLyrics(newLyrics);
   };
 
-  const onSplitBtnClick = () => { };
+  const onSplitBtnClick = () => {
+    const currSelection = getCurrSelection();
+    if (!currSelection.isValid()) {
+      Toast.error('No selection!');
+      return;
+    }
+    if (currSelection.length !== 1) {
+      Toast.error('Please select at just one element to split');
+      return;
+    }
+    const selectedLrc = lyrics[currSelection.smaller];
+    resetSelectionStates();
+    const newLyrics: LyricElement[] = [...selectedLrc.obj.text].map((e) => ({
+      obj: {
+        text: e,
+        duration: {
+          startTime: undefined,
+          endTime: undefined,
+        }
+      },
+      furi: undefined
+    }));
+    newLyrics[0].obj.duration.startTime = selectedLrc.obj.duration.startTime;
+    newLyrics[0].furi = selectedLrc.furi;
+    newLyrics[newLyrics.length - 1].obj.duration.endTime = selectedLrc.obj.duration.endTime;
+    setLyrics([
+      ...lyrics.slice(undefined, currSelection.smaller),
+      ...newLyrics,
+      ...lyrics.slice(currSelection.smaller + 1)
+    ]);
+  };
 
   const onLoadFuriBtnClick = () => {
     const currSelection = getCurrSelection();
@@ -212,16 +241,33 @@ export default function LyricPanel(props: LyricPanelProps) {
       <Button onClick={onSplitBtnClick}>Split</Button>
       <Button onClick={onLoadFuriBtnClick}>Load Furi</Button>
       <Button onClick={onClearFuriBtnClick}>Clear Furi</Button>
+      <Dropdown
+        render={
+          <Dropdown.Menu>
+            <Dropdown.Title><IconTriangleUp size='extra-small' /> Timetag</Dropdown.Title>
+            <Dropdown.Item><IconPlus />Insert Timetag</Dropdown.Item>
+            <Dropdown.Item><IconDelete />Delete Timetag</Dropdown.Item>
+            <Dropdown.Title><IconPause size='extra-small' /> Stopper</Dropdown.Title>
+            <Dropdown.Item><IconPlus />Add Stopper</Dropdown.Item>
+            <Dropdown.Item><IconDelete />Delete Stopper</Dropdown.Item>
+          </Dropdown.Menu>
+        }>
+        <Button>Timetag Operations</Button>
+      </Dropdown>
+      <Button>Edit Mode</Button>
     </div>
     <div className='lyric-panel' onMouseDown={mouseDownListener}>
       {lyrics.map((l, id) => {
-
         let isLineSelected = false;
-        if (curSelectedLineNo === 0 && id <= lineBreakPositions[curSelectedLineNo]) {
+        if (curSelectedLineNo === 0 && id <= lineBreakPositionsRef.current[curSelectedLineNo]) {
           isLineSelected = true;
-        } else if (curSelectedLineNo === lineBreakPositions.length && id > lineBreakPositions[curSelectedLineNo]) {
+        } else if (curSelectedLineNo === lineBreakPositionsRef.current.length
+          && id > lineBreakPositionsRef.current[curSelectedLineNo - 1]
+        ) {
           isLineSelected = true;
-        } else if (id > lineBreakPositions[curSelectedLineNo - 1] && id <= lineBreakPositions[curSelectedLineNo]) {
+        } else if (id > lineBreakPositionsRef.current[curSelectedLineNo - 1]
+          && id <= lineBreakPositionsRef.current[curSelectedLineNo]
+        ) {
           isLineSelected = true;
         }
 
@@ -230,6 +276,7 @@ export default function LyricPanel(props: LyricPanelProps) {
         const singleWord = <SingleWord
           id={id} lyricElement={l} key={id}
           isSelected={isSelected}
+          isLast={id === lyrics.length - 1}
           onLyricElementChange={onLyricElementChange}
           onMouseDown={onElementMouseDown}
           onMouseOver={onElementMouseOver}

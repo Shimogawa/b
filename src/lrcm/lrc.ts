@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { IpadicFeatures, Kuromoji, Tokenizer } from '../kuromoji/kuromoji.d.ts';
 import '../kuromoji/kuromoji';
-import { LyricElement } from './types';
+import { LyricElement, TimedObject } from './types';
 import * as wanakana from 'wanakana';
 import { fit } from 'furigana';
 
@@ -27,21 +27,81 @@ export async function initLrc() {
 
 // TODO: add a map for common mistaken tokens to improve correctness
 
+function isSmallKana(c: string): boolean {
+  return [
+    'ゃ', 'ゅ', 'ょ', 'ゎ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ',
+    'ャ', 'ュ', 'ョ', 'ヮ', 'ァ', 'ィ', 'ゥ', 'ェ', 'ォ',
+  ].includes(c);
+}
+
+function isSokuon(c: string): boolean {
+  return ['っ', 'ッ'].includes(c);
+}
+
+export function furiStringToList(
+  s: string | undefined, tagCount: number | undefined = undefined
+): TimedObject[] | undefined {
+  if (!s) return undefined;
+  const res: TimedObject[] = [];
+  const regularKanaCnt = [...s].filter(c => !isSmallKana(c) && !isSokuon(c)).length;
+  const smallKanaCnt = [...s].filter(isSmallKana).length;
+  const sokuonCnt = s.length - regularKanaCnt - smallKanaCnt;
+  tagCount = tagCount === undefined ? regularKanaCnt : Math.min(tagCount, s.length);
+  let regularTagCnt = tagCount < regularKanaCnt ? tagCount : regularKanaCnt;
+  tagCount -= regularTagCnt;
+  let sokuonTagCnt = tagCount < sokuonCnt ? Math.max(0, tagCount) : sokuonCnt;
+  tagCount -= sokuonTagCnt;
+  let smallTagCnt = tagCount < smallKanaCnt ? Math.max(0, tagCount) : smallKanaCnt;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    const isSmall = isSmallKana(c);
+    const isSokuonChar = isSokuon(c);
+    if (isSmall && smallTagCnt > 0) {
+      res.push({
+        text: c,
+        duration: {},
+      });
+      smallTagCnt--;
+    } else if (isSokuonChar && sokuonTagCnt > 0) {
+      res.push({
+        text: c,
+        duration: {},
+      });
+      sokuonTagCnt--;
+    } else if (!isSmall && !isSokuonChar && regularTagCnt > 0) {
+      res.push({
+        text: c,
+        duration: {},
+      });
+      regularTagCnt--;
+    } else {
+      res[res.length - 1].text += c;
+    }
+  }
+  return res;
+}
+
+function preprocessLyrics(s: string): string {
+  s = s.replace(/\r\n/g, '\n').replace(/\n+/g, '\n');
+  return s;
+}
+
 /**
  * Raw lyrics means that there's no LRC tag associated with the lyrics,
  * and it contains the lyrics ONLY
  * @param s Raw lyrics in string
  */
 export function parseRawLyrics(s: string, processFuri = true): LyricElement[] {
-  s = s.replace(/\r\n/g, '\n');
-  // const x = [...s].map((c) => ({
-  //   obj: { text: c, duration: {} },
-  //   furi: undefined,
-  // }));
+  s = preprocessLyrics(s);
+  if (!processFuri)
+    return [...s].map((c) => ({
+      obj: { text: c, duration: {} },
+      furi: undefined,
+    }));
   const tokens = tokenizer.value!.tokenize(s);
   const res: LyricElement[] = [];
   tokens.forEach((r) => {
-    if (processFuri && r.reading && [...r.basic_form].some(wanakana.isKanji)) {
+    if (r.reading && [...r.basic_form].some(wanakana.isKanji)) {
       const cs = fit(r.surface_form, wanakana.toHiragana(r.reading), { type: 'object' });
       cs?.forEach(e => {
         if (!wanakana.isKanji(e.w)) {
@@ -54,10 +114,7 @@ export function parseRawLyrics(s: string, processFuri = true): LyricElement[] {
         if (!e.r) console.log(e);
         res.push({
           obj: { text: e.w, duration: {} },
-          furi: e.r ? [...e.r].map(c => ({
-            text: c,
-            duration: {},
-          })) : undefined,
+          furi: furiStringToList(e.r),
         });
       });
     } else {

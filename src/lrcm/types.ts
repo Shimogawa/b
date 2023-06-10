@@ -5,11 +5,11 @@ export interface Duration {
 
 export interface TimedObject {
   text: string
-  duration: Duration
+  duration?: Duration
 }
 
 export interface LyricElement {
-  obj: TimedObject
+  obj: Required<TimedObject>
   furi?: TimedObject[]
 }
 

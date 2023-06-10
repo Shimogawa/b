@@ -38,5 +38,14 @@
 }
 
 .single-word .lower {
+    display: flex;
     height: 20px;
+}
+
+.single-word .lower .timetag:not(:first-child) {
+    margin-left: -0.44em;
+}
+
+.single-word .lower .stoptag {
+    margin-left: auto;
 }

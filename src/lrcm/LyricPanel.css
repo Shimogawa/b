@@ -7,7 +7,7 @@
 .lyric-toolbar {
     display: flex;
     flex-direction: row;
-    align-items: baseline;
+    align-items: center;
     justify-content: flex-start;
     padding: 10px;
     box-sizing: border-box;
