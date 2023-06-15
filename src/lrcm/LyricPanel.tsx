@@ -25,6 +25,8 @@ export default function LyricPanel(props: LyricPanelProps) {
   const lineBreakPositionsRef = useRef<number[]>([]);
   const [curSelectedLineNo, setCurSelectedLineNo] = useState(-1);
 
+  const [kanaInput, setKanaInput] = useState(false);
+
   const resetSelectionStates = () => {
     mouseDownRef.current = false;
     setCurSelectedLineNo(-1);
@@ -255,6 +257,9 @@ export default function LyricPanel(props: LyricPanelProps) {
         <Button>Timetag Operations</Button>
       </Dropdown>
       <Button>Edit Mode</Button>
+      <Button onClick={() => setKanaInput(!kanaInput)} theme={kanaInput ? 'solid' : 'light'}>
+        Kana Input: {kanaInput ? 'ON' : 'OFF'}
+      </Button>
     </div>
     <div className='lyric-panel' onMouseDown={mouseDownListener}>
       {lyrics.map((l, id) => {
@@ -277,6 +282,7 @@ export default function LyricPanel(props: LyricPanelProps) {
           id={id} lyricElement={l} key={id}
           isSelected={isSelected}
           isLast={id === lyrics.length - 1}
+          kanaInput={kanaInput}
           onLyricElementChange={onLyricElementChange}
           onMouseDown={onElementMouseDown}
           onMouseOver={onElementMouseOver}

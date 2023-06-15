@@ -1,9 +1,10 @@
-import React, { RefObject, useEffect, useRef, useState } from 'react';
+import React, { RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import './SingleWord.css';
-import { Input, Popconfirm, Toast } from '@douyinfe/semi-ui';
+import { Input, Popconfirm, Switch, Toast } from '@douyinfe/semi-ui';
 import { LyricElement } from './types';
 import { IconArrowDown, IconCaretup, IconPause } from '@douyinfe/semi-icons';
 import { furiStringToList } from './lrc';
+import * as wanakana from 'wanakana';
 
 const lyricElementEqualWithoutDuration = (a: LyricElement, b: LyricElement) => {
   if (a.obj.text !== b.obj.text) return false;
@@ -22,6 +23,7 @@ type SingleWordProps = {
   // isSelected: boolean,
   isSelected: boolean,
   isLast: boolean,
+  kanaInput: boolean,
 
   // hooks
   onLyricElementChange: (elem: LyricElement, id: number) => void,
@@ -37,20 +39,23 @@ const SingleWord = React.memo(function SingleWord({
   onMouseOver,
   isSelected,
   isLast,
+  kanaInput,
 }: SingleWordProps) {
   console.error('re-render');
-  const furiInputRef = useRef<React.RefObject<HTMLInputElement>>();
+  // const furiInputRef = useRef<React.RefObject<HTMLInputElement>>();
+  const [furiInput, setFuriInput] = useState(lyricElement.furi?.map(f => f.text).join('') || '');
   const [hasStopper, setHasStopper] = useState(isLast);
 
   const onFuriConfirm = () => {
-    if (!furiInputRef.current) {
-      Toast.warning('Cannot find furi');
-      return;
-    }
+    // if (!furiInputRef.current) {
+    //   Toast.warning('Cannot find furi');
+    //   return;
+    // }
     onLyricElementChange(
       {
         ...lyricElement,
-        furi: furiStringToList(furiInputRef.current.current!.value),
+        // furi: furiStringToList(furiInputRef.current.current!.value),
+        furi: furiStringToList(furiInput),
       }, id
     );
     // setFuri([...furiInputRef.current.current!.value].map(c => ({ text: c, duration: {} })));
@@ -86,14 +91,20 @@ const SingleWord = React.memo(function SingleWord({
     return tags;
   };
 
+  const listenFuriInput = useCallback((s: string) => {
+    setFuriInput(kanaInput ? wanakana.toKana(s, { IMEMode: true }) : s);
+  }, [kanaInput]);
+
   return (<div className={'single-word' + (/\s/.test(lyricElement.obj.text) ? ' empty' : '')}>
     <Popconfirm
       title="Modify Furi"
       content={({ initialFocusRef }) => {
-        furiInputRef.current = initialFocusRef as RefObject<HTMLInputElement>;
+        // furiInputRef.current = initialFocusRef as RefObject<HTMLInputElement>;
         return <Input // TODO: confirm on press enter. Not provided for now, probably need to heck with getElementById
           ref={initialFocusRef as React.RefObject<HTMLInputElement>}
-          defaultValue={lyricElement.furi?.map(f => f.text).join('')}
+          value={furiInput}
+          // defaultValue={lyricElement.furi?.map(f => f.text).join('')}
+          onChange={listenFuriInput}
         />;
       }
       }
@@ -124,6 +135,7 @@ const SingleWord = React.memo(function SingleWord({
   return prev.id === next.id
     && lyricElementEqualWithoutDuration(prev.lyricElement, next.lyricElement)
     && prev.isSelected === next.isSelected
+    && prev.kanaInput === next.kanaInput
     && prev.onLyricElementChange === next.onLyricElementChange
     && prev.onMouseDown === next.onMouseDown
     && prev.onMouseOver === next.onMouseOver;
