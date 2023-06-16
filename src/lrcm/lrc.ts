@@ -38,6 +38,24 @@ function isSokuon(c: string): boolean {
   return ['っ', 'ッ'].includes(c);
 }
 
+export function getFuriAsString(e: LyricElement): string {
+  if (e.furi === undefined)
+    return '';
+  return e.furi.map(f => f.text).join('');
+}
+
+export function getCurrentTimetagCount(e: LyricElement): number {
+  if (e.furi === undefined)
+    return e.obj.duration.defined ? 1 : 0;
+  return e.furi.length;
+}
+
+export function getMaxTimetagCount(e: LyricElement): number {
+  if (e.furi === undefined)
+    return 1;
+  return e.furi.map(f => f.text.length).reduce((a, b) => a + b, 0);
+}
+
 export function furiStringToList(
   s: string | undefined, tagCount: number | undefined = undefined
 ): TimedObject[] | undefined {
@@ -59,19 +77,19 @@ export function furiStringToList(
     if (isSmall && smallTagCnt > 0) {
       res.push({
         text: c,
-        duration: {},
+        duration: { defined: false },
       });
       smallTagCnt--;
     } else if (isSokuonChar && sokuonTagCnt > 0) {
       res.push({
         text: c,
-        duration: {},
+        duration: { defined: false },
       });
       sokuonTagCnt--;
     } else if (!isSmall && !isSokuonChar && regularTagCnt > 0) {
       res.push({
         text: c,
-        duration: {},
+        duration: { defined: false },
       });
       regularTagCnt--;
     } else {
@@ -95,7 +113,7 @@ export function parseRawLyrics(s: string, processFuri = true): LyricElement[] {
   s = preprocessLyrics(s);
   if (!processFuri)
     return [...s].map((c) => ({
-      obj: { text: c, duration: {} },
+      obj: { text: c, duration: { defined: true } },
       furi: undefined,
     }));
   const tokens = tokenizer.value!.tokenize(s);
@@ -106,21 +124,22 @@ export function parseRawLyrics(s: string, processFuri = true): LyricElement[] {
       cs?.forEach(e => {
         if (!wanakana.isKanji(e.w)) {
           [...e.w].map(x => res.push({
-            obj: { text: x, duration: {} },
+            obj: { text: x, duration: { defined: true } },
             furi: undefined,
           }));
           return;
         }
         if (!e.r) console.log(e);
         res.push({
-          obj: { text: e.w, duration: {} },
+          obj: { text: e.w, duration: { defined: true } },
           furi: furiStringToList(e.r),
         });
       });
     } else {
+      // no furi
       for (let i = 0; i < r.surface_form.length; i++) {
         res.push({
-          obj: { text: r.surface_form[i], duration: {} },
+          obj: { text: r.surface_form[i], duration: { defined: true } },
           furi: undefined,
         });
       }

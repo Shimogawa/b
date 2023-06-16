@@ -3,12 +3,14 @@ import './SingleWord.css';
 import { Input, Popconfirm, Switch, Toast } from '@douyinfe/semi-ui';
 import { LyricElement } from './types';
 import { IconArrowDown, IconCaretup, IconPause } from '@douyinfe/semi-icons';
-import { furiStringToList } from './lrc';
+import { furiStringToList, getCurrentTimetagCount } from './lrc';
 import * as wanakana from 'wanakana';
 
 const lyricElementEqualWithoutDuration = (a: LyricElement, b: LyricElement) => {
-  if (a.obj.text !== b.obj.text) return false;
-  if (a.furi?.length !== b.furi?.length) return false;
+  if (a.obj.text !== b.obj.text
+    || a.obj.duration.defined !== b.obj.duration.defined
+    || a.furi?.length !== b.furi?.length)
+    return false;
   if (a.furi && b.furi) {
     for (let i = 0; i < a.furi.length; i++) {
       if (a.furi[i].text !== b.furi[i].text) return false;
@@ -47,10 +49,6 @@ const SingleWord = React.memo(function SingleWord({
   const [hasStopper, setHasStopper] = useState(isLast);
 
   const onFuriConfirm = () => {
-    // if (!furiInputRef.current) {
-    //   Toast.warning('Cannot find furi');
-    //   return;
-    // }
     onLyricElementChange(
       {
         ...lyricElement,
@@ -58,7 +56,6 @@ const SingleWord = React.memo(function SingleWord({
         furi: furiStringToList(furiInput),
       }, id
     );
-    // setFuri([...furiInputRef.current.current!.value].map(c => ({ text: c, duration: {} })));
   };
 
   const processChar = (c: string) => {
@@ -75,14 +72,11 @@ const SingleWord = React.memo(function SingleWord({
   const getLowerTags = (lyricElement: LyricElement, hasStopper: boolean) => {
     const tags = [];
     if (!lyricElement.furi) {
-      tags.push(<IconCaretup key={`${id}-tag-0`} size="small" className="timetag" />);
+      if (getCurrentTimetagCount(lyricElement) !== 0)
+        tags.push(<IconCaretup key={`${id}-tag-0`} size="small" className="timetag" />);
     } else {
-      for (let i = 0; i < lyricElement.furi.length; i++) {
-        if (lyricElement.furi[i].duration) {
-          tags.push(<IconCaretup key={`${id}-tag-${i}`} size="small" className="timetag" />);
-        } else {
-          break;
-        }
+      for (let i = 0; i < getCurrentTimetagCount(lyricElement); i++) {
+        tags.push(<IconCaretup key={`${id}-tag-${i}`} size="small" className="timetag" />);
       }
     }
     if (hasStopper) {

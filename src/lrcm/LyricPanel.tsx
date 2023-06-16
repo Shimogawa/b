@@ -3,7 +3,7 @@ import SingleWord from './SingleWord';
 import './LyricPanel.css';
 import { DragSelection, LyricElement, TimedObject } from './types';
 import { Button, Dropdown, Toast } from '@douyinfe/semi-ui';
-import { parseRawLyrics } from './lrc';
+import { furiStringToList, getCurrentTimetagCount, getFuriAsString, getMaxTimetagCount, parseRawLyrics } from './lrc';
 import { IconCaretup, IconDelete, IconPause, IconPlus, IconTriangleUp } from '@douyinfe/semi-icons';
 
 type LyricPanelProps = {
@@ -38,8 +38,11 @@ export default function LyricPanel(props: LyricPanelProps) {
     const lbPos: number[] = [];
     lyrics.forEach((e, i) => { if (e.obj.text === '\n') lbPos.push(i); });
     // setLineBreakPositions(lbPos);
-    lineBreakPositionsRef.current = lbPos;
-    resetSelectionStates();
+    if (lineBreakPositionsRef.current.length !== lbPos.length
+      || lineBreakPositionsRef.current.some((v, i) => v !== lbPos[i])) {
+      lineBreakPositionsRef.current = lbPos;
+      resetSelectionStates();
+    }
   }, [lyrics]);
 
   useEffect(() => {
@@ -151,7 +154,8 @@ export default function LyricPanel(props: LyricPanelProps) {
         duration: {
           startTime: selectedLrcs[0].obj.duration.startTime,
           endTime: selectedLrcs[selectedLrcs.length - 1].obj.duration.endTime,
-        }
+          defined: selectedLrcs[0].obj.duration.defined || selectedLrcs[selectedLrcs.length - 1].obj.duration.defined,
+        },
       },
       furi: selectedLrcs.map(e => e.furi ? e.furi : { text: e.obj.text, duration: { ...e.obj.duration } }).flat(),
     };
@@ -167,14 +171,21 @@ export default function LyricPanel(props: LyricPanelProps) {
     setLyrics(newLyrics);
   };
 
-  const onSplitBtnClick = () => {
-    const currSelection = getCurrSelection();
+  const validateOnlyOneSelection = (currSelection: DragSelection) => {
     if (!currSelection.isValid()) {
       Toast.error('No selection!');
-      return;
+      return false;
     }
     if (currSelection.length !== 1) {
-      Toast.error('Please select at just one element to split');
+      Toast.error('Please select just one element!');
+      return false;
+    }
+    return true;
+  };
+
+  const onSplitBtnClick = () => {
+    const currSelection = getCurrSelection();
+    if (!validateOnlyOneSelection(currSelection)) {
       return;
     }
     const selectedLrc = lyrics[currSelection.smaller];
@@ -185,12 +196,15 @@ export default function LyricPanel(props: LyricPanelProps) {
         duration: {
           startTime: undefined,
           endTime: undefined,
-        }
+          defined: false,
+        },
       },
       furi: undefined
     }));
+    newLyrics[0].obj.duration.defined = selectedLrc.obj.duration.startTime !== undefined;
     newLyrics[0].obj.duration.startTime = selectedLrc.obj.duration.startTime;
     newLyrics[0].furi = selectedLrc.furi;
+    newLyrics[newLyrics.length - 1].obj.duration.defined = selectedLrc.obj.duration.endTime !== undefined;
     newLyrics[newLyrics.length - 1].obj.duration.endTime = selectedLrc.obj.duration.endTime;
     setLyrics([
       ...lyrics.slice(undefined, currSelection.smaller),
@@ -237,6 +251,45 @@ export default function LyricPanel(props: LyricPanelProps) {
     resetSelectionStates();
   };
 
+  const onInsertTimetagBtnClick = () => {
+    const currSelection = getCurrSelection();
+    if (!validateOnlyOneSelection(currSelection))
+      return;
+    const selectedElem = { ...lyrics[currSelection.smaller] };
+    if (selectedElem.furi === undefined) {
+      if (getCurrentTimetagCount(selectedElem) >= 1) {
+        Toast.error('At most one timetag can be added to the element without furi.');
+        return;
+      }
+    } else {
+      // this operation will lose time information on furi
+      if (getCurrentTimetagCount(selectedElem) >= getMaxTimetagCount(selectedElem)) {
+        Toast.error('Number of timetags cannot exceed furi length.');
+        return;
+      }
+      selectedElem.furi = furiStringToList(
+        getFuriAsString(selectedElem),
+        getCurrentTimetagCount(selectedElem) + 1);
+    }
+    setLyrics([
+      ...lyrics.slice(undefined, currSelection.smaller),
+      selectedElem,
+      ...lyrics.slice(currSelection.smaller + 1)
+    ]);
+  };
+
+  const onLyricPanelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    switch (e.key) {
+      default:
+        return;
+      case ' ':
+        onInsertTimetagBtnClick();
+        break;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return lyrics.length > 0 ? (<>
     <div className='lyric-toolbar'>
       <Button onClick={onMergeBtnClick}>Merge</Button>
@@ -247,7 +300,7 @@ export default function LyricPanel(props: LyricPanelProps) {
         render={
           <Dropdown.Menu>
             <Dropdown.Title><IconTriangleUp size='extra-small' /> Timetag</Dropdown.Title>
-            <Dropdown.Item><IconPlus />Insert Timetag</Dropdown.Item>
+            <Dropdown.Item onClick={onInsertTimetagBtnClick}><IconPlus />Insert Timetag</Dropdown.Item>
             <Dropdown.Item><IconDelete />Delete Timetag</Dropdown.Item>
             <Dropdown.Title><IconPause size='extra-small' /> Stopper</Dropdown.Title>
             <Dropdown.Item><IconPlus />Add Stopper</Dropdown.Item>
@@ -261,7 +314,9 @@ export default function LyricPanel(props: LyricPanelProps) {
         Kana Input: {kanaInput ? 'ON' : 'OFF'}
       </Button>
     </div>
-    <div className='lyric-panel' onMouseDown={mouseDownListener}>
+    <div className='lyric-panel' tabIndex={0}
+      onMouseDown={mouseDownListener}
+      onKeyDown={onLyricPanelKeyDown}>
       {lyrics.map((l, id) => {
         let isLineSelected = false;
         if (curSelectedLineNo === 0 && id <= lineBreakPositionsRef.current[curSelectedLineNo]) {

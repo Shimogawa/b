@@ -3,9 +3,13 @@ export interface Duration {
   endTime?: number
 }
 
+export interface HasDefinedFlag {
+  defined: boolean
+}
+
 export interface TimedObject {
   text: string
-  duration?: Duration
+  duration?: Duration & HasDefinedFlag
 }
 
 export interface LyricElement {
