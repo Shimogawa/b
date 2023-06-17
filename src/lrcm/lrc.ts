@@ -45,9 +45,9 @@ export function getFuriAsString(e: LyricElement): string {
 }
 
 export function getCurrentTimetagCount(e: LyricElement): number {
-  if (e.furi === undefined)
-    return e.obj.duration.defined ? 1 : 0;
-  return e.furi.length;
+  return e.hasTimeTag
+    ? (e.furi === undefined ? 1 : e.furi.length)
+    : 0;
 }
 
 export function getMaxTimetagCount(e: LyricElement): number {
@@ -64,6 +64,12 @@ export function furiStringToList(
   const regularKanaCnt = [...s].filter(c => !isSmallKana(c) && !isSokuon(c)).length;
   const smallKanaCnt = [...s].filter(isSmallKana).length;
   const sokuonCnt = s.length - regularKanaCnt - smallKanaCnt;
+  if (tagCount === 0 || tagCount === 1) {
+    return [{
+      text: s,
+      duration: undefined,
+    }];
+  }
   tagCount = tagCount === undefined ? regularKanaCnt : Math.min(tagCount, s.length);
   let regularTagCnt = tagCount < regularKanaCnt ? tagCount : regularKanaCnt;
   tagCount -= regularTagCnt;
@@ -77,19 +83,19 @@ export function furiStringToList(
     if (isSmall && smallTagCnt > 0) {
       res.push({
         text: c,
-        duration: { defined: false },
+        duration: undefined,
       });
       smallTagCnt--;
     } else if (isSokuonChar && sokuonTagCnt > 0) {
       res.push({
         text: c,
-        duration: { defined: false },
+        duration: undefined,
       });
       sokuonTagCnt--;
     } else if (!isSmall && !isSokuonChar && regularTagCnt > 0) {
       res.push({
         text: c,
-        duration: { defined: false },
+        duration: undefined,
       });
       regularTagCnt--;
     } else {
@@ -113,8 +119,9 @@ export function parseRawLyrics(s: string, processFuri = true): LyricElement[] {
   s = preprocessLyrics(s);
   if (!processFuri)
     return [...s].map((c) => ({
-      obj: { text: c, duration: { defined: true } },
+      obj: { text: c, duration: {} },
       furi: undefined,
+      hasTimeTag: true,
     }));
   const tokens = tokenizer.value!.tokenize(s);
   const res: LyricElement[] = [];
@@ -124,23 +131,26 @@ export function parseRawLyrics(s: string, processFuri = true): LyricElement[] {
       cs?.forEach(e => {
         if (!wanakana.isKanji(e.w)) {
           [...e.w].map(x => res.push({
-            obj: { text: x, duration: { defined: true } },
+            obj: { text: x, duration: {} },
             furi: undefined,
+            hasTimeTag: true,
           }));
           return;
         }
         if (!e.r) console.log(e);
         res.push({
-          obj: { text: e.w, duration: { defined: true } },
+          obj: { text: e.w, duration: {} },
           furi: furiStringToList(e.r),
+          hasTimeTag: true,
         });
       });
     } else {
       // no furi
       for (let i = 0; i < r.surface_form.length; i++) {
         res.push({
-          obj: { text: r.surface_form[i], duration: { defined: true } },
+          obj: { text: r.surface_form[i], duration: {} },
           furi: undefined,
+          hasTimeTag: true,
         });
       }
     }

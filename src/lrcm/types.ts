@@ -3,18 +3,15 @@ export interface Duration {
   endTime?: number
 }
 
-export interface HasDefinedFlag {
-  defined: boolean
-}
-
 export interface TimedObject {
   text: string
-  duration?: Duration & HasDefinedFlag
+  duration?: Duration
 }
 
 export interface LyricElement {
   obj: Required<TimedObject>
   furi?: TimedObject[]
+  hasTimeTag: boolean
 }
 
 export class DragSelection {

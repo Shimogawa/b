@@ -23,6 +23,11 @@
     display: flex;
 }
 
+.single-word .upper>* {
+    border: 1px solid;
+    box-sizing: border-box;
+}
+
 .single-word.empty {
     min-width: 30px;
 }

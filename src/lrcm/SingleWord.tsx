@@ -8,7 +8,7 @@ import * as wanakana from 'wanakana';
 
 const lyricElementEqualWithoutDuration = (a: LyricElement, b: LyricElement) => {
   if (a.obj.text !== b.obj.text
-    || a.obj.duration.defined !== b.obj.duration.defined
+    || a.hasTimeTag !== b.hasTimeTag
     || a.furi?.length !== b.furi?.length)
     return false;
   if (a.furi && b.furi) {
@@ -47,6 +47,10 @@ const SingleWord = React.memo(function SingleWord({
   // const furiInputRef = useRef<React.RefObject<HTMLInputElement>>();
   const [furiInput, setFuriInput] = useState(lyricElement.furi?.map(f => f.text).join('') || '');
   const [hasStopper, setHasStopper] = useState(isLast);
+
+  useEffect(() => {
+    setFuriInput(lyricElement.furi?.map(f => f.text).join('') || '');
+  }, [lyricElement.furi]);
 
   const onFuriConfirm = () => {
     onLyricElementChange(
@@ -93,6 +97,7 @@ const SingleWord = React.memo(function SingleWord({
     <Popconfirm
       title="Modify Furi"
       content={({ initialFocusRef }) => {
+        // console.log(furiInput);
         // furiInputRef.current = initialFocusRef as RefObject<HTMLInputElement>;
         return <Input // TODO: confirm on press enter. Not provided for now, probably need to heck with getElementById
           ref={initialFocusRef as React.RefObject<HTMLInputElement>}

@@ -9,11 +9,13 @@ import { IconCaretup, IconDelete, IconPause, IconPlus, IconTriangleUp } from '@d
 type LyricPanelProps = {
   // rawLyrics: string,
   lyricState: [LyricElement[], React.Dispatch<React.SetStateAction<LyricElement[]>>]
+  isPlaying: boolean,
 }
 
 // TODO: optimization to make the lyrics array line-based
 
 export default function LyricPanel(props: LyricPanelProps) {
+  const isPlaying = props.isPlaying;
   const mouseDownRef = useRef(false);
   const dragAnchorRef = useRef<number | null>(null);
   const lyricsRef = useRef<LyricElement[]>([]);
@@ -154,10 +156,17 @@ export default function LyricPanel(props: LyricPanelProps) {
         duration: {
           startTime: selectedLrcs[0].obj.duration.startTime,
           endTime: selectedLrcs[selectedLrcs.length - 1].obj.duration.endTime,
-          defined: selectedLrcs[0].obj.duration.defined || selectedLrcs[selectedLrcs.length - 1].obj.duration.defined,
         },
       },
-      furi: selectedLrcs.map(e => e.furi ? e.furi : { text: e.obj.text, duration: { ...e.obj.duration } }).flat(),
+      furi: selectedLrcs.map(e => e.furi
+        ? e.furi
+        : {
+          text: e.obj.text,
+          duration: e.obj.duration.startTime === undefined && e.obj.duration.endTime === undefined
+            ? undefined
+            : { ...e.obj.duration }
+        }).flat(),
+      hasTimeTag: selectedLrcs[0].hasTimeTag || selectedLrcs[selectedLrcs.length - 1].hasTimeTag,
     };
     // console.log(mergedObj);
 
@@ -196,15 +205,15 @@ export default function LyricPanel(props: LyricPanelProps) {
         duration: {
           startTime: undefined,
           endTime: undefined,
-          defined: false,
         },
       },
-      furi: undefined
+      furi: undefined,
+      hasTimeTag: false,
     }));
-    newLyrics[0].obj.duration.defined = selectedLrc.obj.duration.startTime !== undefined;
+    newLyrics[0].hasTimeTag = selectedLrc.obj.duration.startTime !== undefined;
     newLyrics[0].obj.duration.startTime = selectedLrc.obj.duration.startTime;
     newLyrics[0].furi = selectedLrc.furi;
-    newLyrics[newLyrics.length - 1].obj.duration.defined = selectedLrc.obj.duration.endTime !== undefined;
+    newLyrics[newLyrics.length - 1].hasTimeTag = selectedLrc.obj.duration.endTime !== undefined;
     newLyrics[newLyrics.length - 1].obj.duration.endTime = selectedLrc.obj.duration.endTime;
     setLyrics([
       ...lyrics.slice(undefined, currSelection.smaller),
@@ -236,6 +245,7 @@ export default function LyricPanel(props: LyricPanelProps) {
           return {
             obj: e.obj,
             furi: undefined,
+            hasTimeTag: e.hasTimeTag,
           };
         }
         return e;
@@ -245,6 +255,7 @@ export default function LyricPanel(props: LyricPanelProps) {
         return {
           obj: e.obj,
           furi: undefined,
+          hasTimeTag: e.hasTimeTag,
         };
       }));
     }
@@ -271,6 +282,36 @@ export default function LyricPanel(props: LyricPanelProps) {
         getFuriAsString(selectedElem),
         getCurrentTimetagCount(selectedElem) + 1);
     }
+    selectedElem.hasTimeTag = true;
+    setLyrics([
+      ...lyrics.slice(undefined, currSelection.smaller),
+      selectedElem,
+      ...lyrics.slice(currSelection.smaller + 1)
+    ]);
+  };
+
+  const onDeleteTimetagBtnClick = () => {
+    const currSelection = getCurrSelection();
+    if (!validateOnlyOneSelection(currSelection))
+      return;
+    const selectedElem = { ...lyrics[currSelection.smaller] };
+    const currentTimetagCount = getCurrentTimetagCount(selectedElem);
+    if (selectedElem.furi === undefined) {
+      if (currentTimetagCount === 0) {
+        return;
+      }
+      selectedElem.hasTimeTag = false;
+    } else {
+      if (currentTimetagCount === 0) {
+        return;
+      }
+      if (currentTimetagCount === 1) {
+        selectedElem.hasTimeTag = false;
+      }
+      selectedElem.furi = furiStringToList(
+        getFuriAsString(selectedElem),
+        currentTimetagCount - 1);
+    }
     setLyrics([
       ...lyrics.slice(undefined, currSelection.smaller),
       selectedElem,
@@ -279,13 +320,21 @@ export default function LyricPanel(props: LyricPanelProps) {
   };
 
   const onLyricPanelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    switch (e.key) {
-      default:
-        return;
-      case ' ':
-        onInsertTimetagBtnClick();
-        break;
-    }
+    if ((e.target as HTMLDivElement).id !== 'lyric-panel')
+      return;
+    if (!isPlaying) {
+      switch (e.key) {
+        default:
+          return;
+        case ' ':
+          onInsertTimetagBtnClick();
+          break;
+        case 'Backspace':
+        case 'Delete':
+          onDeleteTimetagBtnClick();
+          break;
+      }
+    } else { }
     e.preventDefault();
     e.stopPropagation();
   };
@@ -301,7 +350,7 @@ export default function LyricPanel(props: LyricPanelProps) {
           <Dropdown.Menu>
             <Dropdown.Title><IconTriangleUp size='extra-small' /> Timetag</Dropdown.Title>
             <Dropdown.Item onClick={onInsertTimetagBtnClick}><IconPlus />Insert Timetag</Dropdown.Item>
-            <Dropdown.Item><IconDelete />Delete Timetag</Dropdown.Item>
+            <Dropdown.Item onClick={onDeleteTimetagBtnClick}><IconDelete />Delete Timetag</Dropdown.Item>
             <Dropdown.Title><IconPause size='extra-small' /> Stopper</Dropdown.Title>
             <Dropdown.Item><IconPlus />Add Stopper</Dropdown.Item>
             <Dropdown.Item><IconDelete />Delete Stopper</Dropdown.Item>
@@ -314,7 +363,7 @@ export default function LyricPanel(props: LyricPanelProps) {
         Kana Input: {kanaInput ? 'ON' : 'OFF'}
       </Button>
     </div>
-    <div className='lyric-panel' tabIndex={0}
+    <div className='lyric-panel' tabIndex={0} id='lyric-panel'
       onMouseDown={mouseDownListener}
       onKeyDown={onLyricPanelKeyDown}>
       {lyrics.map((l, id) => {
