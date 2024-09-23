@@ -1,12 +1,30 @@
 import { Button, Col, Row, Slider, Space, Toast } from '@douyinfe/semi-ui';
 import { IconPlay, IconFastForward, IconBackward, IconPause, IconMute } from '@douyinfe/semi-icons';
 import './MusicPlayer.css';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { secToTimeString } from '../utils';
 
-export default function MusicPlayer(props: { music: File | undefined }) {
+export type MusicPlayerRef = {
+  audio: React.RefObject<HTMLAudioElement>,
+}
+
+const MusicPlayer = forwardRef(function MusicPlayer(
+  props: {
+    music: File | undefined,
+    onPlay?: () => void,
+    onPause?: () => void,
+    onReload?: () => void,
+    onTick?: (isPlaying: boolean, time: number) => void,
+  },
+  ref: React.Ref<MusicPlayerRef>
+) {
   // const audio = useSound(props.music);
   const audio = useRef<HTMLAudioElement>(null);
+
+  const onPlay = props.onPlay;
+  const onPause = props.onPause;
+  const onReload = props.onReload;
+  const onTick = props.onTick;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [curSpeed, setCurSpeed] = useState(100);
@@ -15,25 +33,31 @@ export default function MusicPlayer(props: { music: File | undefined }) {
   const [volumeBeforeMute, setVolumeBeforeMute] = useState(100);
   const [duration, setDuration] = useState(0);
 
+  useImperativeHandle(ref, () => ({ audio: audio }));
+
   useEffect(() => {
     if (!props.music || !audio.current)
       return;
     console.log('changed: ', props.music);
     setIsPlaying(false);
     audio.current.pause();
+    onPause?.();
     audio.current.load();
     setCurSpeed(100);
     setCurTime(0);
+    onReload?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.music]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (!audio.current) return;
       setCurTime(audio.current.currentTime);
+      onTick?.(!audio.current.paused, audio.current.currentTime);
       // console.log('current time ', audio.current.currentTime);
     }, 150);
     return () => clearInterval(interval);
-  }, []);
+  }, [onTick]);
 
   const onMusicMetadataLoaded = () => {
     if (!audio.current)
@@ -41,13 +65,34 @@ export default function MusicPlayer(props: { music: File | undefined }) {
     setDuration(audio.current.duration);
   };
 
+  const hasMusic = () => {
+    return !!audio.current;
+  };
+
   const onPlayBtnClick = () => {
-    if (!audio.current || !props.music) {
+    if (!hasMusic()) {
       Toast.warning('No music to play!');
       return;
     }
     setIsPlaying(true);
-    audio.current.play();
+    audio.current!.play();
+    onPlay?.();
+  };
+
+  const onForwardBtnClick = () => {
+    if (!hasMusic()) {
+      console.warn('no music');
+      return;
+    }
+    audio.current!.currentTime += 5;
+  };
+
+  const onBackwardBtnClick = () => {
+    if (!hasMusic()) {
+      console.warn('no music');
+      return;
+    }
+    audio.current!.currentTime -= 5;
   };
 
   const onPauseBtnClick = () => {
@@ -57,6 +102,7 @@ export default function MusicPlayer(props: { music: File | undefined }) {
     }
     setIsPlaying(false);
     audio.current.pause();
+    onPause?.();
   };
 
   const setVolume = (v: number) => {
@@ -85,6 +131,7 @@ export default function MusicPlayer(props: { music: File | undefined }) {
 
   const onMusicEnd = () => {
     setIsPlaying(false);
+    onPause?.();
   };
 
   return (<div style={{ width: '100%' }}>
@@ -123,6 +170,8 @@ export default function MusicPlayer(props: { music: File | undefined }) {
           <Space style={{ alignItems: 'end' }}>
             <Button className='round-btn round-btn-size-regular'
               theme='solid'
+              disabled={!hasMusic()}
+              onClick={onBackwardBtnClick}
               icon={<IconBackward />} />
             {isPlaying
               ? <Button className='round-btn round-btn-size-large'
@@ -132,9 +181,12 @@ export default function MusicPlayer(props: { music: File | undefined }) {
               : <Button className='round-btn round-btn-size-large'
                 theme='solid'
                 icon={<IconPlay style={{ fontSize: '25px' }} />}
+                disabled={!hasMusic()}
                 onClick={onPlayBtnClick} />}
             <Button className='round-btn round-btn-size-regular'
               theme='solid'
+              disabled={!hasMusic()}
+              onClick={onForwardBtnClick}
               icon={<IconFastForward />} />
           </Space>
         </div>
@@ -166,4 +218,6 @@ export default function MusicPlayer(props: { music: File | undefined }) {
       </Col>
     </Row>
   </div>);
-}
+});
+
+export default MusicPlayer;

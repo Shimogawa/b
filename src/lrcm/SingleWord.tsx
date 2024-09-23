@@ -9,6 +9,7 @@ import * as wanakana from 'wanakana';
 const lyricElementEqualWithoutDuration = (a: LyricElement, b: LyricElement) => {
   if (a.obj.text !== b.obj.text
     || a.hasTimeTag !== b.hasTimeTag
+    || a.hasStopper !== b.hasStopper
     || a.furi?.length !== b.furi?.length)
     return false;
   if (a.furi && b.furi) {

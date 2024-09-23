@@ -1,4 +1,4 @@
-import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import React, { Fragment, forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import SingleWord from './SingleWord';
 import './LyricPanel.css';
 import { DragSelection, LyricElement, TimedObject } from './types';
@@ -12,9 +12,12 @@ type LyricPanelProps = {
   isPlaying: boolean,
 }
 
-// TODO: optimization to make the lyrics array line-based
+export type LyricPanelRef = {
+  onAudioTick: (isPlaying: boolean, time: number) => void,
+}
 
-export default function LyricPanel(props: LyricPanelProps) {
+// TODO: optimization to make the lyrics array line-based
+const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: React.Ref<LyricPanelRef>) {
   const isPlaying = props.isPlaying;
   const mouseDownRef = useRef(false);
   const dragAnchorRef = useRef<number | null>(null);
@@ -167,6 +170,7 @@ export default function LyricPanel(props: LyricPanelProps) {
             : { ...e.obj.duration }
         }).flat(),
       hasTimeTag: selectedLrcs[0].hasTimeTag || selectedLrcs[selectedLrcs.length - 1].hasTimeTag,
+      hasStopper: selectedLrcs[selectedLrcs.length - 1].hasStopper,
     };
     // console.log(mergedObj);
 
@@ -209,6 +213,7 @@ export default function LyricPanel(props: LyricPanelProps) {
       },
       furi: undefined,
       hasTimeTag: false,
+      hasStopper: false,
     }));
     newLyrics[0].hasTimeTag = selectedLrc.obj.duration.startTime !== undefined;
     newLyrics[0].obj.duration.startTime = selectedLrc.obj.duration.startTime;
@@ -246,6 +251,7 @@ export default function LyricPanel(props: LyricPanelProps) {
             obj: e.obj,
             furi: undefined,
             hasTimeTag: e.hasTimeTag,
+            hasStopper: e.hasStopper,
           };
         }
         return e;
@@ -256,6 +262,7 @@ export default function LyricPanel(props: LyricPanelProps) {
           obj: e.obj,
           furi: undefined,
           hasTimeTag: e.hasTimeTag,
+          hasStopper: e.hasStopper,
         };
       }));
     }
@@ -339,6 +346,12 @@ export default function LyricPanel(props: LyricPanelProps) {
     e.stopPropagation();
   };
 
+  useImperativeHandle(ref, () => ({
+    onAudioTick: (isPlaying: boolean, time: number) => {
+      // console.log(isPlaying, time);
+    }
+  }));
+
   return lyrics.length > 0 ? (<>
     <div className='lyric-toolbar'>
       <Button onClick={onMergeBtnClick}>Merge</Button>
@@ -403,4 +416,6 @@ export default function LyricPanel(props: LyricPanelProps) {
       })}
     </div>
   </>) : <></>;
-}
+});
+
+export default LyricPanel;

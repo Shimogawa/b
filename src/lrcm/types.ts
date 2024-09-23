@@ -12,6 +12,7 @@ export interface LyricElement {
   obj: Required<TimedObject>
   furi?: TimedObject[]
   hasTimeTag: boolean
+  hasStopper: boolean
 }
 
 export class DragSelection {

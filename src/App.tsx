@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import './App.css';
-import { Layout, Space, Switch, Toast } from '@douyinfe/semi-ui';
+import { Layout, Switch, Toast } from '@douyinfe/semi-ui';
 
 import FileSelector from './FileSelector';
 import Navbar from './Navbar';
-import MusicPlayer from './music_player/MusicPlayer';
+import MusicPlayer, { MusicPlayerRef } from './music_player/MusicPlayer';
 import { LyricElement } from './lrcm/types';
-import LyricPanel from './lrcm/LyricPanel';
+import LyricPanel, { LyricPanelRef } from './lrcm/LyricPanel';
 import { initLrc, parseRawLyrics } from './lrcm/lrc';
 
 function App() {
@@ -15,10 +15,14 @@ function App() {
     initLrc().then(() => Toast.success('Tokenizer loaded.'));
   }, []);
 
+  const [isPlaying, setIsPlaying] = useState(false);
   const [audioFile, setAudioFile] = useState<File>();
   const { Header, Footer, Content } = Layout;
   const [lyricElems, setLyricElems] = useState<LyricElement[]>([]);
   const [needsProcessFuri, setNeedsProcessFuri] = useState(true);
+
+  const audioRef = useRef<MusicPlayerRef>(null);
+  const lyricPanelRef = useRef<LyricPanelRef>(null);
 
   return (
     <Layout>
@@ -50,11 +54,16 @@ function App() {
                 Toast.error('Parse error: ' + (err as Error).message);
               }
             }} />
-          <LyricPanel lyricState={[lyricElems, setLyricElems]} />
+          <LyricPanel isPlaying={isPlaying} lyricState={[lyricElems, setLyricElems]} ref={lyricPanelRef} />
         </div>
       </Content>
       <Footer className='sticky-footer'>
-        <MusicPlayer music={audioFile} />
+        <MusicPlayer music={audioFile} ref={audioRef}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onReload={() => setIsPlaying(false)}
+          onTick={lyricPanelRef.current?.onAudioTick}
+        />
       </Footer>
     </Layout >
   );

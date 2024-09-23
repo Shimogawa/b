@@ -10,6 +10,11 @@ declare const kuromoji: Kuromoji;
 
 const tokenizer: { value?: Tokenizer<IpadicFeatures> } = {};
 
+const smallKanaSet = new Set([
+  'ゃ', 'ゅ', 'ょ', 'ゎ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ',
+  'ャ', 'ュ', 'ョ', 'ヮ', 'ァ', 'ィ', 'ゥ', 'ェ', 'ォ',
+]);
+
 export async function initLrc() {
   kuromoji.builder({ dicPath: 'https://raw.githubusercontent.com/takuyaa/kuromoji.js/master/dict/' })
     .build((err, tk) => {
@@ -28,14 +33,15 @@ export async function initLrc() {
 // TODO: add a map for common mistaken tokens to improve correctness
 
 function isSmallKana(c: string): boolean {
-  return [
-    'ゃ', 'ゅ', 'ょ', 'ゎ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ',
-    'ャ', 'ュ', 'ョ', 'ヮ', 'ァ', 'ィ', 'ゥ', 'ェ', 'ォ',
-  ].includes(c);
+  return smallKanaSet.has(c);
 }
 
 function isSokuon(c: string): boolean {
-  return ['っ', 'ッ'].includes(c);
+  return c === 'っ' || c === 'ッ';
+}
+
+function isEnglishOrNumber(c: string): boolean {
+  return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c === '’' || c === '\'';
 }
 
 export function getFuriAsString(e: LyricElement): string {
@@ -98,6 +104,11 @@ export function furiStringToList(
         duration: undefined,
       });
       regularTagCnt--;
+    } else if (res.length === 0) {
+      res.push({
+        text: c,
+        duration: undefined,
+      });
     } else {
       res[res.length - 1].text += c;
     }
@@ -117,14 +128,33 @@ function preprocessLyrics(s: string): string {
  */
 export function parseRawLyrics(s: string, processFuri = true): LyricElement[] {
   s = preprocessLyrics(s);
-  if (!processFuri)
-    return [...s].map((c) => ({
-      obj: { text: c, duration: {} },
-      furi: undefined,
-      hasTimeTag: true,
-    }));
-  const tokens = tokenizer.value!.tokenize(s);
   const res: LyricElement[] = [];
+  const englishBuf: string[] = [];
+  if (!processFuri) {
+    for (let i = 0; i < s.length; i++) {
+      if (isEnglishOrNumber(s[i])) {
+        englishBuf.push(s[i]);
+        continue;
+      }
+      if (englishBuf.length > 0) {
+        res.push({
+          obj: { text: englishBuf.join(''), duration: {} },
+          furi: undefined,
+          hasTimeTag: true,
+          hasStopper: false,
+        });
+        englishBuf.length = 0;
+      }
+      res.push({
+        obj: { text: s[i], duration: {} },
+        furi: undefined,
+        hasTimeTag: true,
+        hasStopper: false,
+      });
+    }
+    return res;
+  }
+  const tokens = tokenizer.value!.tokenize(s);
   tokens.forEach((r) => {
     if (r.reading && [...r.basic_form].some(wanakana.isKanji)) {
       const cs = fit(r.surface_form, wanakana.toHiragana(r.reading), { type: 'object' });
@@ -134,6 +164,7 @@ export function parseRawLyrics(s: string, processFuri = true): LyricElement[] {
             obj: { text: x, duration: {} },
             furi: undefined,
             hasTimeTag: true,
+            hasStopper: false,
           }));
           return;
         }
@@ -142,18 +173,34 @@ export function parseRawLyrics(s: string, processFuri = true): LyricElement[] {
           obj: { text: e.w, duration: {} },
           furi: furiStringToList(e.r),
           hasTimeTag: true,
+          hasStopper: false,
         });
       });
     } else {
       // no furi
       for (let i = 0; i < r.surface_form.length; i++) {
+        if (isEnglishOrNumber(r.surface_form[i])) {
+          englishBuf.push(r.surface_form[i]);
+          continue;
+        }
+        if (englishBuf.length > 0) {
+          res.push({
+            obj: { text: englishBuf.join(''), duration: {} },
+            furi: undefined,
+            hasTimeTag: true,
+            hasStopper: false,
+          });
+          englishBuf.length = 0;
+        }
         res.push({
           obj: { text: r.surface_form[i], duration: {} },
           furi: undefined,
           hasTimeTag: true,
+          hasStopper: false,
         });
       }
     }
   });
+  res[res.length - 1].hasStopper = true;
   return res;
 }

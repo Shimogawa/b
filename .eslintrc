@@ -32,7 +32,7 @@
     "no-empty": "off",
     "no-trailing-spaces": "error",
     "@typescript-eslint/indent": ["error", 2],
-    "@typescript-eslint/no-non-null-assertion": "warn",
+    "@typescript-eslint/no-non-null-assertion": "off",
     "@typescript-eslint/no-empty-function": "off",
     // react
     "react/react-in-jsx-scope": "off",
