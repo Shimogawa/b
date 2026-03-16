@@ -38,7 +38,6 @@ const MusicPlayer = forwardRef(function MusicPlayer(
   useEffect(() => {
     if (!props.music || !audio.current)
       return;
-    console.log('changed: ', props.music);
     setIsPlaying(false);
     audio.current.pause();
     onPause?.();
@@ -124,7 +123,6 @@ const MusicPlayer = forwardRef(function MusicPlayer(
       Toast.error('No music to play!');
       return;
     }
-    console.log(t);
     setCurTime(t);
     audio.current.currentTime = t;
   };

@@ -31,6 +31,9 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
   const [curSelectedLineNo, setCurSelectedLineNo] = useState(-1);
 
   const [kanaInput, setKanaInput] = useState(false);
+  const [ctxMenuVisible, setCtxMenuVisible] = useState(false);
+  const [ctxMenuPos, setCtxMenuPos] = useState({ x: 0, y: 0 });
+  const [ctxMenuSelection, setCtxMenuSelection] = useState(new DragSelection());
 
   const resetSelectionStates = () => {
     mouseDownRef.current = false;
@@ -51,8 +54,7 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
   }, [lyrics]);
 
   useEffect(() => {
-    function mouseUpListener(e: MouseEvent) {
-      e.stopPropagation();
+    function mouseUpListener() {
       mouseDownRef.current = false;
       // dragAnchorRef.current = null;
     }
@@ -72,11 +74,13 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
 
   const onElementMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     // BUG: clicking on the last dragged item doesn't work
-    if (mouseDownRef.current) return;
     e.stopPropagation();
+    if (e.button !== 0) {
+      return;
+    }
+    if (mouseDownRef.current) return;
     mouseDownRef.current = true;
     const id = checkState(e.currentTarget.id);
-    console.log(id);
     let lineNo = -1;
     if ((lineNo = lineBreakPositionsRef.current.indexOf(id)) >= 0) {
       setCurSelectedLineNo(lineNo);
@@ -134,6 +138,37 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
     }
     return new DragSelection(dragAnchorRef.current, dragTo[0]);
   }, [dragTo]);
+
+  // Stable ref so onWordContextMenu doesn't change every time dragTo changes
+  const getCurrSelectionRef = useRef(getCurrSelection);
+  useEffect(() => { getCurrSelectionRef.current = getCurrSelection; }, [getCurrSelection]);
+
+  const onWordContextMenu = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const id = checkState(e.currentTarget.id);
+    const currSel = getCurrSelectionRef.current();
+    let sel: DragSelection;
+    if (!currSel.isValid() || !currSel.isInDragSelection(id)) {
+      sel = new DragSelection(id, id);
+      dragAnchorRef.current = id;
+      setDragTo([id]);
+      let lineNo = -1;
+      let i = 0;
+      for (; i < lineBreakPositionsRef.current.length; i++) {
+        if (lineBreakPositionsRef.current[i] < id) continue;
+        lineNo = i;
+        break;
+      }
+      if (lineNo === -1) lineNo = i;
+      setCurSelectedLineNo(lineNo);
+    } else {
+      sel = currSel.clone();
+    }
+    setCtxMenuSelection(sel);
+    setCtxMenuPos({ x: e.clientX, y: e.clientY });
+    setCtxMenuVisible(true);
+  }, []);
 
   const mouseDownListener = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
@@ -196,6 +231,107 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
     return true;
   };
 
+  const isNavigableIndex = useCallback((index: number) => {
+    return index >= 0 && index < lyrics.length && lyrics[index].obj.text !== '\n';
+  }, [lyrics]);
+
+  const findLineNoByIndex = useCallback((index: number) => {
+    let lineNo = 0;
+    while (lineNo < lineBreakPositionsRef.current.length && lineBreakPositionsRef.current[lineNo] < index) {
+      lineNo += 1;
+    }
+    return lineNo;
+  }, []);
+
+  const getLineNavigableBounds = useCallback((lineNo: number) => {
+    if (lineNo < 0 || lineNo > lineBreakPositionsRef.current.length) {
+      return { start: -1, end: -1 };
+    }
+    const start = lineNo === 0 ? 0 : lineBreakPositionsRef.current[lineNo - 1] + 1;
+    const lineEndIncludingBreak = lineNo < lineBreakPositionsRef.current.length
+      ? lineBreakPositionsRef.current[lineNo]
+      : lyrics.length;
+    const end = lineEndIncludingBreak - 1;
+    return { start, end };
+  }, [lyrics.length]);
+
+  const findNextNavigableIndex = useCallback((from: number, step: 1 | -1) => {
+    let idx = from + step;
+    while (idx >= 0 && idx < lyrics.length) {
+      if (isNavigableIndex(idx)) {
+        return idx;
+      }
+      idx += step;
+    }
+    return null;
+  }, [isNavigableIndex, lyrics.length]);
+
+  const findClosestNavigableInLine = useCallback((lineNo: number, preferredColumn: number) => {
+    const { start, end } = getLineNavigableBounds(lineNo);
+    if (start > end) {
+      return null;
+    }
+    const target = start + preferredColumn;
+    if (target <= start) {
+      return start;
+    }
+    if (target >= end) {
+      return end;
+    }
+    return target;
+  }, [getLineNavigableBounds]);
+
+  const setSingleSelection = useCallback((index: number) => {
+    if (!isNavigableIndex(index)) {
+      return;
+    }
+    dragAnchorRef.current = index;
+    setDragTo([index]);
+    setCurSelectedLineNo(findLineNoByIndex(index));
+  }, [findLineNoByIndex, isNavigableIndex]);
+
+  const getKeyboardAnchor = useCallback((key: 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown') => {
+    const currSelection = getCurrSelection();
+    if (currSelection.isValid()) {
+      if (key === 'ArrowLeft' || key === 'ArrowUp') {
+        return currSelection.smaller;
+      }
+      return currSelection.bigger;
+    }
+    return lyrics.findIndex((e) => e.obj.text !== '\n');
+  }, [getCurrSelection, lyrics]);
+
+  const moveSelectionByArrow = useCallback((key: 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown') => {
+    const anchor = getKeyboardAnchor(key);
+    if (anchor === null || anchor < 0) {
+      return false;
+    }
+    let nextIndex: number | null = null;
+    if (key === 'ArrowLeft') {
+      nextIndex = findNextNavigableIndex(anchor, -1);
+    } else if (key === 'ArrowRight') {
+      nextIndex = findNextNavigableIndex(anchor, 1);
+    } else {
+      const currentLine = findLineNoByIndex(anchor);
+      const { start: currStart } = getLineNavigableBounds(currentLine);
+      const preferredColumn = Math.max(0, anchor - currStart);
+      const step = key === 'ArrowUp' ? -1 : 1;
+      let targetLine = currentLine + step;
+      while (targetLine >= 0 && targetLine <= lineBreakPositionsRef.current.length) {
+        nextIndex = findClosestNavigableInLine(targetLine, preferredColumn);
+        if (nextIndex !== null) {
+          break;
+        }
+        targetLine += step;
+      }
+    }
+    if (nextIndex === null) {
+      nextIndex = anchor;
+    }
+    setSingleSelection(nextIndex);
+    return true;
+  }, [findClosestNavigableInLine, findLineNoByIndex, findNextNavigableIndex, getKeyboardAnchor, getLineNavigableBounds, setSingleSelection]);
+
   const onSplitBtnClick = () => {
     const currSelection = getCurrSelection();
     if (!validateOnlyOneSelection(currSelection)) {
@@ -227,6 +363,61 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
     ]);
   };
 
+  const onCtxMerge = () => {
+    setCtxMenuVisible(false);
+    if (!ctxMenuSelection.isValid() || ctxMenuSelection.length < 2) return;
+    const selectedLrcs = lyrics.slice(ctxMenuSelection.smaller, ctxMenuSelection.bigger + 1);
+    resetSelectionStates();
+    const mergedObj: LyricElement = {
+      obj: {
+        text: selectedLrcs.reduce((prev, curr) => prev + curr.obj.text, ''),
+        duration: {
+          startTime: selectedLrcs[0].obj.duration.startTime,
+          endTime: selectedLrcs[selectedLrcs.length - 1].obj.duration.endTime,
+        },
+      },
+      furi: selectedLrcs.map(e => e.furi
+        ? e.furi
+        : {
+          text: e.obj.text,
+          duration: e.obj.duration.startTime === undefined && e.obj.duration.endTime === undefined
+            ? undefined
+            : { ...e.obj.duration },
+        }).flat(),
+      hasTimeTag: selectedLrcs[0].hasTimeTag || selectedLrcs[selectedLrcs.length - 1].hasTimeTag,
+      hasStopper: selectedLrcs[selectedLrcs.length - 1].hasStopper,
+    };
+    setLyrics([
+      ...lyrics.slice(undefined, ctxMenuSelection.smaller),
+      mergedObj,
+      ...lyrics.slice(ctxMenuSelection.bigger + 1),
+    ]);
+  };
+
+  const onCtxSplit = () => {
+    setCtxMenuVisible(false);
+    if (!ctxMenuSelection.isValid() || ctxMenuSelection.length !== 1) return;
+    const selectedLrc = lyrics[ctxMenuSelection.smaller];
+    if ([...selectedLrc.obj.text].length <= 1) return;
+    resetSelectionStates();
+    const newSplitLyrics: LyricElement[] = [...selectedLrc.obj.text].map((ch) => ({
+      obj: { text: ch, duration: { startTime: undefined, endTime: undefined } },
+      furi: undefined,
+      hasTimeTag: false,
+      hasStopper: false,
+    }));
+    newSplitLyrics[0].hasTimeTag = selectedLrc.obj.duration.startTime !== undefined;
+    newSplitLyrics[0].obj.duration.startTime = selectedLrc.obj.duration.startTime;
+    newSplitLyrics[0].furi = selectedLrc.furi;
+    newSplitLyrics[newSplitLyrics.length - 1].hasTimeTag = selectedLrc.obj.duration.endTime !== undefined;
+    newSplitLyrics[newSplitLyrics.length - 1].obj.duration.endTime = selectedLrc.obj.duration.endTime;
+    setLyrics([
+      ...lyrics.slice(undefined, ctxMenuSelection.smaller),
+      ...newSplitLyrics,
+      ...lyrics.slice(ctxMenuSelection.smaller + 1),
+    ]);
+  };
+
   const onLoadFuriBtnClick = () => {
     const currSelection = getCurrSelection();
     if (currSelection.isValid()) {
@@ -244,9 +435,10 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
   };
 
   const onClearFuriBtnClick = () => {
-    if (getCurrSelection().isValid()) {
+    const currSelection = getCurrSelection();
+    if (currSelection.isValid()) {
       setLyrics(lyrics.map((e, id) => {
-        if (id >= getCurrSelection().smaller && id <= getCurrSelection().bigger) {
+        if (id >= currSelection.smaller && id <= currSelection.bigger) {
           return {
             obj: e.obj,
             furi: undefined,
@@ -329,6 +521,16 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
   const onLyricPanelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if ((e.target as HTMLDivElement).id !== 'lyric-panel')
       return;
+
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      const moved = moveSelectionByArrow(e.key);
+      if (moved) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      return;
+    }
+
     if (!isPlaying) {
       switch (e.key) {
         default:
@@ -351,6 +553,8 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
       // console.log(isPlaying, time);
     }
   }));
+
+  const currSelection = getCurrSelection();
 
   return lyrics.length > 0 ? (<>
     <div className='lyric-toolbar'>
@@ -378,7 +582,8 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
     </div>
     <div className='lyric-panel' tabIndex={0} id='lyric-panel'
       onMouseDown={mouseDownListener}
-      onKeyDown={onLyricPanelKeyDown}>
+      onKeyDown={onLyricPanelKeyDown}
+      onContextMenu={(e) => e.preventDefault()}>
       {lyrics.map((l, id) => {
         let isLineSelected = false;
         if (curSelectedLineNo === 0 && id <= lineBreakPositionsRef.current[curSelectedLineNo]) {
@@ -393,7 +598,7 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
           isLineSelected = true;
         }
 
-        const isSelected = isLineSelected && getCurrSelection().isInDragSelection(id);
+        const isSelected = isLineSelected && currSelection.isInDragSelection(id);
 
         const singleWord = <SingleWord
           id={id} lyricElement={l} key={id}
@@ -403,6 +608,7 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
           onLyricElementChange={onLyricElementChange}
           onMouseDown={onElementMouseDown}
           onMouseOver={onElementMouseOver}
+          onContextMenu={onWordContextMenu}
         />;
         if (l.obj.text === '\n') {
           return (
@@ -415,6 +621,31 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
         return singleWord;
       })}
     </div>
+    {ctxMenuVisible && <>
+      <div className='ctx-menu-backdrop' onMouseDown={() => setCtxMenuVisible(false)} />
+      <div
+        className='ctx-menu'
+        style={{ top: ctxMenuPos.y, left: ctxMenuPos.x }}
+        onMouseDown={e => e.stopPropagation()}
+      >
+        <div
+          className={'ctx-menu-item' + (!ctxMenuSelection.isValid() || ctxMenuSelection.length < 2 ? ' disabled' : '')}
+          onClick={onCtxMerge}
+        >
+          Merge
+        </div>
+        <div
+          className={'ctx-menu-item' + (
+            !ctxMenuSelection.isValid() || ctxMenuSelection.length !== 1
+              || [...(lyrics[ctxMenuSelection.smaller]?.obj.text ?? '')].length <= 1
+              ? ' disabled' : ''
+          )}
+          onClick={onCtxSplit}
+        >
+          Split
+        </div>
+      </div>
+    </>}
   </>) : <></>;
 });
 

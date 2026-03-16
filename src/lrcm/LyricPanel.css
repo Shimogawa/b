@@ -23,3 +23,36 @@
 .lyric-toolbar>*:not(:last-child) {
     margin-right: 10px;
 }
+
+.ctx-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+}
+
+.ctx-menu {
+    position: fixed;
+    z-index: 1000;
+    background: var(--semi-color-bg-2);
+    border: 1px solid var(--semi-color-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 4px 0;
+    min-width: 120px;
+}
+
+.ctx-menu-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--semi-color-text-0);
+}
+
+.ctx-menu-item:hover:not(.disabled) {
+    background: var(--semi-color-fill-0);
+}
+
+.ctx-menu-item.disabled {
+    color: var(--semi-color-disabled-text);
+    cursor: not-allowed;
+}

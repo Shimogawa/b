@@ -32,6 +32,7 @@ type SingleWordProps = {
   onLyricElementChange: (elem: LyricElement, id: number) => void,
   onMouseDown?: React.MouseEventHandler<HTMLDivElement>,
   onMouseOver?: React.MouseEventHandler<HTMLDivElement>,
+  onContextMenu?: React.MouseEventHandler<HTMLDivElement>,
 }
 
 const SingleWord = React.memo(function SingleWord({
@@ -40,11 +41,11 @@ const SingleWord = React.memo(function SingleWord({
   onLyricElementChange,
   onMouseDown,
   onMouseOver,
+  onContextMenu,
   isSelected,
   isLast,
   kanaInput,
 }: SingleWordProps) {
-  console.error('re-render');
   // const furiInputRef = useRef<React.RefObject<HTMLInputElement>>();
   const [furiInput, setFuriInput] = useState(lyricElement.furi?.map(f => f.text).join('') || '');
   const [hasStopper, setHasStopper] = useState(isLast);
@@ -120,7 +121,8 @@ const SingleWord = React.memo(function SingleWord({
       id={`le-middle-${id}`}
       className={'middle' + (isSelected ? ' selected' : '')}
       onMouseOver={onMouseOver}
-      onMouseDown={onMouseDown}>
+      onMouseDown={onMouseDown}
+      onContextMenu={onContextMenu}>
       {[...lyricElement.obj.text].map((c, i) =>
         <span key={`${id}-text-${i}`}>
           {processChar(c)}
@@ -138,7 +140,8 @@ const SingleWord = React.memo(function SingleWord({
     && prev.kanaInput === next.kanaInput
     && prev.onLyricElementChange === next.onLyricElementChange
     && prev.onMouseDown === next.onMouseDown
-    && prev.onMouseOver === next.onMouseOver;
+    && prev.onMouseOver === next.onMouseOver
+    && prev.onContextMenu === next.onContextMenu;
 });
 
 export default SingleWord;
