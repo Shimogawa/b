@@ -51,6 +51,46 @@
     margin-left: -0.44em;
 }
 
+.single-word .lower .timetag.clickable {
+    cursor: pointer;
+}
+
+.single-word .lower .timetag.timetag-idle {
+    color: var(--semi-color-text-2);
+}
+
+.single-word .lower .timetag.timetag-past {
+    color: #2fa84f;
+}
+
+.single-word .lower .timetag.timetag-cursor {
+    color: #d8a600;
+}
+
+.single-word .lower .timetag.timetag-future {
+    color: #d14b4b;
+}
+
 .single-word .lower .stoptag {
     margin-left: auto;
+}
+
+.single-word .lower .stoptag.clickable {
+    cursor: pointer;
+}
+
+.single-word .lower .stoptag.timetag-idle {
+    color: var(--semi-color-text-2);
+}
+
+.single-word .lower .stoptag.timetag-past {
+    color: #2fa84f;
+}
+
+.single-word .lower .stoptag.timetag-cursor {
+    color: #d8a600;
+}
+
+.single-word .lower .stoptag.timetag-future {
+    color: #d14b4b;
 }

@@ -56,3 +56,47 @@
     color: var(--semi-color-disabled-text);
     cursor: not-allowed;
 }
+
+.timetag-debug-window {
+    margin-top: 12px;
+    border: 1px solid var(--semi-color-border);
+    border-radius: 8px;
+    background: var(--semi-color-bg-2);
+    padding: 10px;
+}
+
+.timetag-debug-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.timetag-debug-list {
+    max-height: 220px;
+    overflow-y: auto;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 12px;
+}
+
+.timetag-debug-row {
+    padding: 3px 6px;
+    border-radius: 4px;
+}
+
+.timetag-debug-row+.timetag-debug-row {
+    margin-top: 2px;
+}
+
+.timetag-debug-row.assigned {
+    color: #2c8f44;
+}
+
+.timetag-debug-row.unassigned {
+    color: #b23b3b;
+}
+
+.timetag-debug-row.cursor {
+    background: #ffe58f;
+    color: #6d5a00;
+    font-weight: 600;
+}

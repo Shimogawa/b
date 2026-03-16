@@ -1,10 +1,10 @@
-import React, { Fragment, forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { Fragment, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import SingleWord from './SingleWord';
 import './LyricPanel.css';
-import { DragSelection, LyricElement, TimedObject } from './types';
+import { DragSelection, LyricElement } from './types';
 import { Button, Dropdown, Toast } from '@douyinfe/semi-ui';
 import { furiStringToList, getCurrentTimetagCount, getFuriAsString, getMaxTimetagCount, parseRawLyrics } from './lrc';
-import { IconCaretup, IconDelete, IconPause, IconPlus, IconTriangleUp } from '@douyinfe/semi-icons';
+import { IconDelete, IconPause, IconPlus, IconTriangleUp } from '@douyinfe/semi-icons';
 
 type LyricPanelProps = {
   // rawLyrics: string,
@@ -16,12 +16,18 @@ export type LyricPanelRef = {
   onAudioTick: (isPlaying: boolean, time: number) => void,
 }
 
+type TimeTagStatus = 'idle' | 'past' | 'cursor' | 'future';
+type TimeTagPosition = {
+  elementIndex: number,
+  timetagIndex: number,
+  kind: 'normal' | 'stopper',
+};
+
 // TODO: optimization to make the lyrics array line-based
 const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: React.Ref<LyricPanelRef>) {
   const isPlaying = props.isPlaying;
   const mouseDownRef = useRef(false);
   const dragAnchorRef = useRef<number | null>(null);
-  const lyricsRef = useRef<LyricElement[]>([]);
   const [dragTo, setDragTo] = useState<[number] | null>(null);
 
   const [lyrics, setLyrics] = props.lyricState;
@@ -34,6 +40,8 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
   const [ctxMenuVisible, setCtxMenuVisible] = useState(false);
   const [ctxMenuPos, setCtxMenuPos] = useState({ x: 0, y: 0 });
   const [ctxMenuSelection, setCtxMenuSelection] = useState(new DragSelection());
+  const [playModeCursor, setPlayModeCursor] = useState<number>(-1);
+  const playbackTimeRef = useRef(0);
 
   const resetSelectionStates = () => {
     mouseDownRef.current = false;
@@ -118,6 +126,267 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
   const onLyricElementChange = useCallback((e: LyricElement, id: number) => {
     setLyrics((prev) => [...prev.slice(undefined, id), e, ...prev.slice(id + 1)]);
   }, [setLyrics]);
+
+  const timetagPositions = useMemo(() => {
+    const positions: TimeTagPosition[] = [];
+    lyrics.forEach((element, elementIndex) => {
+      const timetagCount = getCurrentTimetagCount(element);
+      for (let timetagIndex = 0; timetagIndex < timetagCount; timetagIndex++) {
+        positions.push({ elementIndex, timetagIndex, kind: 'normal' });
+      }
+      if (element.hasStopper) {
+        positions.push({ elementIndex, timetagIndex: -1, kind: 'stopper' });
+      }
+    });
+    return positions;
+  }, [lyrics]);
+
+  const getTimetagPositionKey = useCallback((position: TimeTagPosition) => {
+    return `${position.elementIndex}:${position.kind === 'stopper' ? 'stopper' : position.timetagIndex}`;
+  }, []);
+
+  const getNormalTimetagKey = useCallback((elementIndex: number, timetagIndex: number) => {
+    return `${elementIndex}:${timetagIndex}`;
+  }, []);
+
+  const getStopperKey = useCallback((elementIndex: number) => {
+    return `${elementIndex}:stopper`;
+  }, []);
+
+  const timetagIndexByPosition = useMemo(() => {
+    const map = new Map<string, number>();
+    timetagPositions.forEach((position, index) => {
+      map.set(getTimetagPositionKey(position), index);
+    });
+    return map;
+  }, [getTimetagPositionKey, timetagPositions]);
+
+  useEffect(() => {
+    if (timetagPositions.length === 0) {
+      if (playModeCursor !== -1) {
+        setPlayModeCursor(-1);
+      }
+      return;
+    }
+    if (playModeCursor > timetagPositions.length) {
+      setPlayModeCursor(timetagPositions.length);
+    }
+    if (playModeCursor < 0 && timetagPositions.length > 0) {
+      setPlayModeCursor(0);
+    }
+  }, [playModeCursor, timetagPositions.length]);
+
+  const isTimetagAssigned = useCallback((elementIndex: number, timetagIndex: number) => {
+    const element = lyrics[elementIndex];
+    if (!element) {
+      return false;
+    }
+    if (!element.furi) {
+      return element.obj.duration.startTime !== undefined;
+    }
+    if (timetagIndex < 0 || timetagIndex >= element.furi.length) {
+      return false;
+    }
+    return element.furi[timetagIndex].duration?.startTime !== undefined;
+  }, [lyrics]);
+
+  const isStopperAssigned = useCallback((elementIndex: number) => {
+    const element = lyrics[elementIndex];
+    if (!element || !element.hasStopper) {
+      return false;
+    }
+    return element.obj.duration.endTime !== undefined;
+  }, [lyrics]);
+
+  const timetagDebugRows = useMemo(() => {
+    return timetagPositions.map((position, index) => {
+      const element = lyrics[position.elementIndex];
+      const isAssigned = position.kind === 'stopper'
+        ? isStopperAssigned(position.elementIndex)
+        : isTimetagAssigned(position.elementIndex, position.timetagIndex);
+      const assignedTime = !isAssigned
+        ? undefined
+        : (position.kind === 'stopper'
+          ? element.obj.duration.endTime
+          : (element.furi
+            ? element.furi[position.timetagIndex]?.duration?.startTime
+            : element.obj.duration.startTime));
+      return {
+        globalIndex: index,
+        elementIndex: position.elementIndex,
+        timetagIndex: position.timetagIndex,
+        kind: position.kind,
+        text: element.obj.text,
+        assignedTime,
+        isAssigned,
+      };
+    });
+  }, [isStopperAssigned, isTimetagAssigned, lyrics, timetagPositions]);
+
+  const assignCurrentCursorTime = useCallback(() => {
+    if (playModeCursor < 0 || playModeCursor >= timetagPositions.length) {
+      return;
+    }
+    const target = timetagPositions[playModeCursor];
+    const currentTime = playbackTimeRef.current;
+    setLyrics((prev) => {
+      const oldElement = prev[target.elementIndex];
+      if (!oldElement) {
+        return prev;
+      }
+      const next = [...prev];
+      if (target.kind === 'stopper') {
+        next[target.elementIndex] = {
+          ...oldElement,
+          obj: {
+            ...oldElement.obj,
+            duration: {
+              ...oldElement.obj.duration,
+              endTime: currentTime,
+            },
+          },
+        };
+      } else if (oldElement.furi && target.timetagIndex < oldElement.furi.length) {
+        const nextFuri = [...oldElement.furi];
+        const oldTimedObject = nextFuri[target.timetagIndex];
+        nextFuri[target.timetagIndex] = {
+          ...oldTimedObject,
+          duration: {
+            ...(oldTimedObject.duration ?? {}),
+            startTime: currentTime,
+          },
+        };
+        next[target.elementIndex] = {
+          ...oldElement,
+          furi: nextFuri,
+        };
+      } else {
+        next[target.elementIndex] = {
+          ...oldElement,
+          obj: {
+            ...oldElement.obj,
+            duration: {
+              ...oldElement.obj.duration,
+              startTime: currentTime,
+            },
+          },
+        };
+      }
+      return next;
+    });
+    setPlayModeCursor((prev) => {
+      if (prev < 0 || timetagPositions.length === 0) {
+        return prev;
+      }
+      return Math.min(prev + 1, timetagPositions.length);
+    });
+  }, [playModeCursor, setLyrics, timetagPositions]);
+
+  const clearCurrentCursorTime = useCallback(() => {
+    if (timetagPositions.length === 0 || playModeCursor < 0) {
+      return;
+    }
+
+    const targetIndex = playModeCursor >= timetagPositions.length
+      ? timetagPositions.length - 1
+      : playModeCursor;
+    const target = timetagPositions[targetIndex];
+
+    setLyrics((prev) => {
+      const oldElement = prev[target.elementIndex];
+      if (!oldElement) {
+        return prev;
+      }
+
+      const next = [...prev];
+      if (target.kind === 'stopper') {
+        next[target.elementIndex] = {
+          ...oldElement,
+          obj: {
+            ...oldElement.obj,
+            duration: {
+              ...oldElement.obj.duration,
+              endTime: undefined,
+            },
+          },
+        };
+      } else if (oldElement.furi && target.timetagIndex < oldElement.furi.length) {
+        const nextFuri = [...oldElement.furi];
+        const oldTimedObject = nextFuri[target.timetagIndex];
+        nextFuri[target.timetagIndex] = {
+          ...oldTimedObject,
+          duration: oldTimedObject.duration
+            ? {
+              ...oldTimedObject.duration,
+              startTime: undefined,
+            }
+            : undefined,
+        };
+        next[target.elementIndex] = {
+          ...oldElement,
+          furi: nextFuri,
+        };
+      } else {
+        next[target.elementIndex] = {
+          ...oldElement,
+          obj: {
+            ...oldElement.obj,
+            duration: {
+              ...oldElement.obj.duration,
+              startTime: undefined,
+            },
+          },
+        };
+      }
+      return next;
+    });
+
+    setPlayModeCursor(Math.max(targetIndex - 1, 0));
+  }, [playModeCursor, setLyrics, timetagPositions]);
+
+  const onPlayModeTimetagClick = useCallback((elementIndex: number, timetagIndex: number) => {
+    const idx = timetagIndexByPosition.get(getNormalTimetagKey(elementIndex, timetagIndex));
+    if (idx === undefined) {
+      return;
+    }
+    setPlayModeCursor(idx);
+  }, [getNormalTimetagKey, timetagIndexByPosition]);
+
+  const onStopperClick = useCallback((elementIndex: number) => {
+    const idx = timetagIndexByPosition.get(getStopperKey(elementIndex));
+    if (idx === undefined) {
+      return;
+    }
+    setPlayModeCursor(idx);
+  }, [getStopperKey, timetagIndexByPosition]);
+
+  const getTimetagStatus = useCallback((elementIndex: number, timetagIndex: number): TimeTagStatus => {
+    const idx = timetagIndexByPosition.get(getNormalTimetagKey(elementIndex, timetagIndex));
+    if (idx === undefined) {
+      return 'future';
+    }
+    if (playModeCursor >= 0 && playModeCursor < timetagPositions.length && idx === playModeCursor) {
+      return 'cursor';
+    }
+    if (isTimetagAssigned(elementIndex, timetagIndex)) {
+      return 'past';
+    }
+    return 'future';
+  }, [getNormalTimetagKey, isTimetagAssigned, playModeCursor, timetagIndexByPosition, timetagPositions.length]);
+
+  const getStopperStatus = useCallback((elementIndex: number): TimeTagStatus => {
+    const idx = timetagIndexByPosition.get(getStopperKey(elementIndex));
+    if (idx === undefined) {
+      return 'future';
+    }
+    if (playModeCursor >= 0 && playModeCursor < timetagPositions.length && idx === playModeCursor) {
+      return 'cursor';
+    }
+    if (isStopperAssigned(elementIndex)) {
+      return 'past';
+    }
+    return 'future';
+  }, [getStopperKey, isStopperAssigned, playModeCursor, timetagIndexByPosition, timetagPositions.length]);
 
   const getCurrSelection = useCallback(() => {
     if (dragAnchorRef.current === null || dragTo === null) {
@@ -543,16 +812,28 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
           onDeleteTimetagBtnClick();
           break;
       }
-    } else { }
+    } else {
+      switch (e.key) {
+        case ' ':
+          assignCurrentCursorTime();
+          break;
+        case 'Backspace':
+          clearCurrentCursorTime();
+          break;
+        default:
+          return;
+      }
+    }
     e.preventDefault();
     e.stopPropagation();
   };
 
   useImperativeHandle(ref, () => ({
-    onAudioTick: (isPlaying: boolean, time: number) => {
-      // console.log(isPlaying, time);
+    onAudioTick: (_isPlaying: boolean, time: number) => {
+      void _isPlaying;
+      playbackTimeRef.current = time;
     }
-  }));
+  }), []);
 
   const currSelection = getCurrSelection();
 
@@ -605,6 +886,11 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
           isSelected={isSelected}
           isLast={id === lyrics.length - 1}
           kanaInput={kanaInput}
+          isPlayMode={isPlaying}
+          getTimetagStatus={getTimetagStatus}
+          onTimetagClick={onPlayModeTimetagClick}
+          getStopperStatus={getStopperStatus}
+          onStopperClick={onStopperClick}
           onLyricElementChange={onLyricElementChange}
           onMouseDown={onElementMouseDown}
           onMouseOver={onElementMouseOver}
@@ -620,6 +906,25 @@ const LyricPanel = forwardRef(function LyricPanel(props: LyricPanelProps, ref: R
         }
         return singleWord;
       })}
+    </div>
+    <div className='timetag-debug-window'>
+      <div className='timetag-debug-title'>Timetag Debug</div>
+      <div className='timetag-debug-list'>
+        {timetagDebugRows.map((row) => {
+          const isCursor = row.globalIndex === playModeCursor;
+          const assignedText = row.assignedTime === undefined ? '-' : row.assignedTime.toFixed(3);
+          return (
+            <div
+              key={`debug-${row.globalIndex}`}
+              className={'timetag-debug-row'
+                + (isCursor ? ' cursor' : '')
+                + (row.isAssigned ? ' assigned' : ' unassigned')}
+            >
+              #{row.globalIndex} E{row.elementIndex} {row.kind === 'stopper' ? 'S' : `T${row.timetagIndex}`} "{row.text}" = {assignedText}
+            </div>
+          );
+        })}
+      </div>
     </div>
     {ctxMenuVisible && <>
       <div className='ctx-menu-backdrop' onMouseDown={() => setCtxMenuVisible(false)} />

@@ -1,6 +1,6 @@
-import React, { RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import './SingleWord.css';
-import { Input, Popconfirm, Switch, Toast } from '@douyinfe/semi-ui';
+import { Input, Popconfirm } from '@douyinfe/semi-ui';
 import { LyricElement } from './types';
 import { IconArrowDown, IconCaretup, IconPause } from '@douyinfe/semi-icons';
 import { furiStringToList, getCurrentTimetagCount } from './lrc';
@@ -27,6 +27,11 @@ type SingleWordProps = {
   isSelected: boolean,
   isLast: boolean,
   kanaInput: boolean,
+  isPlayMode: boolean,
+  getTimetagStatus: (elementIndex: number, timetagIndex: number) => 'idle' | 'past' | 'cursor' | 'future',
+  onTimetagClick: (elementIndex: number, timetagIndex: number) => void,
+  getStopperStatus: (elementIndex: number) => 'idle' | 'past' | 'cursor' | 'future',
+  onStopperClick: (elementIndex: number) => void,
 
   // hooks
   onLyricElementChange: (elem: LyricElement, id: number) => void,
@@ -45,10 +50,14 @@ const SingleWord = React.memo(function SingleWord({
   isSelected,
   isLast,
   kanaInput,
+  isPlayMode,
+  getTimetagStatus,
+  onTimetagClick,
+  getStopperStatus,
+  onStopperClick,
 }: SingleWordProps) {
   // const furiInputRef = useRef<React.RefObject<HTMLInputElement>>();
   const [furiInput, setFuriInput] = useState(lyricElement.furi?.map(f => f.text).join('') || '');
-  const [hasStopper, setHasStopper] = useState(isLast);
 
   useEffect(() => {
     setFuriInput(lyricElement.furi?.map(f => f.text).join('') || '');
@@ -78,15 +87,52 @@ const SingleWord = React.memo(function SingleWord({
   const getLowerTags = (lyricElement: LyricElement, hasStopper: boolean) => {
     const tags = [];
     if (!lyricElement.furi) {
-      if (getCurrentTimetagCount(lyricElement) !== 0)
-        tags.push(<IconCaretup key={`${id}-tag-0`} size="small" className="timetag" />);
+      if (getCurrentTimetagCount(lyricElement) !== 0) {
+        const status = getTimetagStatus(id, 0);
+        tags.push(
+          <IconCaretup
+            key={`${id}-tag-0`}
+            size="small"
+            className={`timetag timetag-${status} clickable${isPlayMode ? ' playing' : ''}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTimetagClick(id, 0);
+            }}
+          />
+        );
+      }
     } else {
       for (let i = 0; i < getCurrentTimetagCount(lyricElement); i++) {
-        tags.push(<IconCaretup key={`${id}-tag-${i}`} size="small" className="timetag" />);
+        const status = getTimetagStatus(id, i);
+        tags.push(
+          <IconCaretup
+            key={`${id}-tag-${i}`}
+            size="small"
+            className={`timetag timetag-${status} clickable${isPlayMode ? ' playing' : ''}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTimetagClick(id, i);
+            }}
+          />
+        );
       }
     }
     if (hasStopper) {
-      tags.push(<IconPause key={`${id}-stopper`} size="extra-small" className="stoptag" />);
+      const stopperStatus = getStopperStatus(id);
+      tags.push(
+        <IconPause
+          key={`${id}-stopper`}
+          size="extra-small"
+          className={`stoptag timetag-${stopperStatus} clickable${isPlayMode ? ' playing' : ''}`}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onStopperClick(id);
+          }}
+        />
+      );
     }
     return tags;
   };
@@ -130,7 +176,7 @@ const SingleWord = React.memo(function SingleWord({
     </div>
     <div className='lower' id={`le-lower-${id}`} style={{ fontSize: '12px' }}>
       {/* {[...lyricElement.obj.text].reduce((prev, cur) => prev + ' ' + cur.codePointAt(0)?.toString(16), '')} */}
-      {getLowerTags(lyricElement, hasStopper)}
+      {getLowerTags(lyricElement, isLast)}
     </div>
   </div>);
 }, (prev, next) => {
@@ -138,6 +184,11 @@ const SingleWord = React.memo(function SingleWord({
     && lyricElementEqualWithoutDuration(prev.lyricElement, next.lyricElement)
     && prev.isSelected === next.isSelected
     && prev.kanaInput === next.kanaInput
+    && prev.isPlayMode === next.isPlayMode
+    && prev.getTimetagStatus === next.getTimetagStatus
+    && prev.onTimetagClick === next.onTimetagClick
+    && prev.getStopperStatus === next.getStopperStatus
+    && prev.onStopperClick === next.onStopperClick
     && prev.onLyricElementChange === next.onLyricElementChange
     && prev.onMouseDown === next.onMouseDown
     && prev.onMouseOver === next.onMouseOver
